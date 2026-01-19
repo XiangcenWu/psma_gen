@@ -1,13 +1,16 @@
 import os
 import shutil
-import tempfile
 import zipfile
 import rarfile
 from pathlib import Path
 
+# personal imports
+from Inference_TS import inference_ts
+from Dicom2Nii import separate_dicom_modalities
 
+output_dir = '/data/xiangcen/pet_gen/processed/batch1'
 
-def process_zip_files(pressed_dir, ):
+def process_zip_files(pressed_dir):
 
 
     zip_files_list = os.listdir(pressed_dir)
@@ -36,12 +39,38 @@ def process_zip_files(pressed_dir, ):
         # get the current zip files' patients
         patients = os.listdir(tmp_dir)
         print(patients)
+        
+
+        # somethimes zipped files are one floder with oirginal name
+        intermediate_dir = None
+        if len(patients) == 1:
+            intermediate_dir = patients[0]
+            patients = os.listdir(os.path.join(tmp_dir, intermediate_dir))
+        
+        
         for patient in patients:
-            patient_dir = os.path.join(tmp_dir, patient)
+            if intermediate_dir:
+                patient_dir = os.path.join(tmp_dir, intermediate_dir, patient)
+            else:
+                patient_dir = os.path.join(tmp_dir, patient)
+
+                
+                
             psma_dir, fdg_dir = seperate_psma_dir(patient_dir)
             psma_dir, fdg_dir = os.path.join(patient_dir, psma_dir, 'DICOM'), \
                 os.path.join(patient_dir, fdg_dir, 'DICOM')
             print(psma_dir, fdg_dir)
+            
+            # set the patient's output dir
+            patient_output_dir = os.path.join(output_dir, patient)
+            if not os.path.isdir(patient_output_dir):
+                os.mkdir(patient_output_dir)
+            
+            # generate nii files
+            separate_dicom_modalities(psma_dir, patient_output_dir, 'psma')
+            separate_dicom_modalities(fdg_dir, patient_output_dir, 'fdg')
+
+
 
         shutil.rmtree(tmp_dir)
 
