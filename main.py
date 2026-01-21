@@ -1,35 +1,18 @@
 import torch
 from monai.networks.nets import DiffusionModelUNet
-
-
-
-
-from Training.data_loader import create_data_loader
-
-
-
+import os
+from Training.data_loader import create_data_loader, ReadH5d
 
 
 device = 'cuda:0'
 
+base_dir = '/data/xiangcen/pet_gen/processed/batch1'
 
-model = DiffusionModelUNet(
-    spatial_dims=3,
-    in_channels=1,
-    out_channels=1,
-).to(device)
+patients = [os.path.join(base_dir, patient_name, 'data_h5.h5') for patient_name in os.listdir(base_dir)]
+train_loader = create_data_loader(patients, ReadH5d(), batch_size=2)
 
-
-
-
-x = torch.rand(1, 1, 128, 128, 384).to(device)
-
-
-
-o = model(x, 100)
-
-
-print(o.shape)
-
+for batch in train_loader:
+    psma_ct_tensor = batch['psma_ct'].to(device)
+    psma_pt_tensor = batch['psma_pt'].to(device)
 
 
