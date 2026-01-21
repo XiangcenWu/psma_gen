@@ -60,68 +60,69 @@ def save_h5(file_name: str,
         
         
         
-patient_dir = '/data/xiangcen/pet_gen/processed/batch1'
-patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
 
 
-for dir in tqdm(patient_dir, desc="Processing patients", unit="patient"):
-    fdg_ct = read_nii(os.path.join(dir, 'fdgCT_series2.nii.gz'))
-    psma_ct = read_nii(os.path.join(dir, 'psmaCT_series2.nii.gz'))  
+def crop_and_intensity(patient_dir):
 
-    fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
-    psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
+    print(f'cropping and intensity range to {patient_dir}')
 
-    fdg_mask = read_nii(os.path.join(dir, 'fdgCT_body_mask.nii.gz'))
-    psma_mask = read_nii(os.path.join(dir, 'psmaCT_body_mask.nii.gz'))
+    patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
+
     
-    # resample PTs to CTs
-    fdg_pt = sitk.Resample(fdg_pt, fdg_ct, sitk.Transform(), sitk.sitkLinear)
-    psma_pt = sitk.Resample(psma_pt, psma_ct, sitk.Transform(), sitk.sitkLinear)
-    
-    
-    fdg_ct = read_nii_tensor(fdg_ct)
-    psma_ct = read_nii_tensor(psma_ct)  
+    for dir in tqdm(patient_dir, desc="cropping and intensity range", unit="case"):
+        
+        fdg_ct = read_nii(os.path.join(dir, 'fdgCT_series2.nii.gz'))
+        psma_ct = read_nii(os.path.join(dir, 'psmaCT_series2.nii.gz'))  
 
-    fdg_pt = read_nii_tensor(fdg_pt)   
-    psma_pt = read_nii_tensor(psma_pt)
+        fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
+        psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
 
-    fdg_mask = read_nii_tensor(fdg_mask)
-    psma_mask = read_nii_tensor(psma_mask)
+        fdg_mask = read_nii(os.path.join(dir, 'fdgCT_body_mask.nii.gz'))
+        psma_mask = read_nii(os.path.join(dir, 'psmaCT_body_mask.nii.gz'))
+        
+        # resample PTs to CTs
+        fdg_pt = sitk.Resample(fdg_pt, fdg_ct, sitk.Transform(), sitk.sitkLinear)
+        psma_pt = sitk.Resample(psma_pt, psma_ct, sitk.Transform(), sitk.sitkLinear)
+        
+        
+        fdg_ct = read_nii_tensor(fdg_ct)
+        psma_ct = read_nii_tensor(psma_ct)  
 
+        fdg_pt = read_nii_tensor(fdg_pt)   
+        psma_pt = read_nii_tensor(psma_pt)
 
-    fdg_ct = cropAbyB(fdg_ct, fdg_mask)
-    fdg_pt = cropAbyB(fdg_pt, fdg_mask)
-    fdg_mask = cropAbyB(fdg_mask, fdg_mask)
-
-    psma_ct = cropAbyB(psma_ct, psma_mask)
-    psma_pt = cropAbyB(psma_pt, psma_mask)
-    psma_mask = cropAbyB(psma_mask, psma_mask)
-
-
-    # print(fdg_ct.shape, psma_ct.shape)
-    # print(fdg_ct.unique(), psma_ct.unique())
-    # print(fdg_mask.unique(), psma_mask.unique())
+        fdg_mask = read_nii_tensor(fdg_mask)
+        psma_mask = read_nii_tensor(psma_mask)
 
 
-    scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
-    resizer = Resize((128, 128, 384), mode="trilinear")
-    resizer_mask = Resize((128, 128, 384), mode="nearest-exact")
+        fdg_ct = cropAbyB(fdg_ct, fdg_mask)
+        fdg_pt = cropAbyB(fdg_pt, fdg_mask)
+        fdg_mask = cropAbyB(fdg_mask, fdg_mask)
+
+        psma_ct = cropAbyB(psma_ct, psma_mask)
+        psma_pt = cropAbyB(psma_pt, psma_mask)
+        psma_mask = cropAbyB(psma_mask, psma_mask)
 
 
 
-    fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
-    fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
+        scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
+        resizer = Resize((128, 128, 384), mode="trilinear")
+        resizer_mask = Resize((128, 128, 384), mode="nearest-exact")
 
 
-    psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
-    psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
-    
-    
-    save_h5(
-        os.path.join(dir, 'data_h5.h5'),
-        fdg_ct,
-        fdg_pt,
-        psma_ct,
-        psma_pt
-    )
-    # print(f'{os.path.join(dir, 'data_h5.h5')} is saved')
+
+        fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
+        fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
+
+
+        psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
+        psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
+        
+        
+        save_h5(
+            os.path.join(dir, 'data_h5.h5'),
+            fdg_ct,
+            fdg_pt,
+            psma_ct,
+            psma_pt
+        )

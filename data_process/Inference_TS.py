@@ -1,6 +1,6 @@
 import os
 from totalsegmentator.python_api import totalsegmentator
-
+from tqdm import tqdm
 
 os.environ["TOTALSEG_WEIGHTS_PATH"] = '/data/xiangcen/TotalSegmentator'
 
@@ -9,7 +9,7 @@ def inference_ts(ct_dir, output_dir, task='body'):
     totalsegmentator(ct_dir, output_dir, ml=True, task=task)
 
 
-if __name__ == '__main__':
+def get_ct_bodymask(patients_dir):
     
     fdgCT_name = 'fdgCT_series2.nii.gz'
     psmaCT_name = 'psmaCT_series2.nii.gz'
@@ -18,8 +18,7 @@ if __name__ == '__main__':
     psmaCT_mask_name = 'psmaCT_body_mask.nii.gz'
     
     
-    patients_dir = '/data/xiangcen/pet_gen/processed/batch1'
-    for patient_dir in os.listdir(patients_dir):
+    for patient_dir in tqdm(os.listdir(patients_dir), desc='Get Ct Mask', unit='case'):
         print(patient_dir)
 
         fdgCT_dir = os.path.join(patients_dir, patient_dir, fdgCT_name)

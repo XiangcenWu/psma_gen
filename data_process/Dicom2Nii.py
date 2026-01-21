@@ -46,7 +46,7 @@ def separate_dicom_modalities(input_folder, output_folder, pet_tracer):
     modality_files = defaultdict(list)
     
     # 遍历所有DICOM文件
-    print("正在扫描DICOM文件...")
+    # print("正在扫描DICOM文件...")
     for filename in os.listdir(input_folder):
         filepath = os.path.join(input_folder, filename)
         
@@ -78,19 +78,19 @@ def separate_dicom_modalities(input_folder, output_folder, pet_tracer):
             modality_files[key].append(filepath)
             
         except Exception as e:
-            print(f"无法读取文件 {filename}: {e}")
+            # print(f"无法读取文件 {filename}: {e}")
             continue
     
     # 按模态分组并读取图像
-    print(f"\n找到 {len(modality_files)} 个不同的序列:")
+    # print(f"\n找到 {len(modality_files)} 个不同的序列:")
     
     for idx, (key, files) in enumerate(modality_files.items(), 1):
         modality = key.split('_')[0]
-        print(f"\n序列 {idx}: {modality} - {len(files)} 个文件")
+        # print(f"\n序列 {idx}: {modality} - {len(files)} 个文件")
         
         try:
             # ⭐ 关键修复: 按切片位置排序,而不是文件名!
-            print("  正在按切片位置排序...")
+            # print("  正在按切片位置排序...")
             files_with_location = [(f, get_slice_location(f)) for f in files]
             files_sorted = [f for f, _ in sorted(files_with_location, key=lambda x: x[1])]
             
@@ -116,14 +116,14 @@ def separate_dicom_modalities(input_folder, output_folder, pet_tracer):
             # 保存为.nii.gz格式
             output_path = os.path.join(output_folder, pet_tracer + f"{modality}_series{idx}.nii.gz")
             sitk.WriteImage(image, output_path)
-            print(f"  ✓ 已保存: {output_path}")
-            print(f"  图像尺寸: {image.GetSize()}")
-            print(f"  图像间距: {image.GetSpacing()}")
-            print(f"  切片数量: {image.GetDepth()}")
+            # print(f"  ✓ 已保存: {output_path}")
+            # print(f"  图像尺寸: {image.GetSize()}")
+            # print(f"  图像间距: {image.GetSpacing()}")
+            # print(f"  切片数量: {image.GetDepth()}")
             
         except Exception as e:
-            print(f"  ✗ 处理序列 {key} 时出错: {e}")
-            print(f"    尝试使用手动排序...")
+            # print(f"  ✗ 处理序列 {key} 时出错: {e}")
+            # print(f"    尝试使用手动排序...")
             
             # 备用方案: 手动排序
             try:
@@ -137,10 +137,10 @@ def separate_dicom_modalities(input_folder, output_folder, pet_tracer):
 
                 output_path = os.path.join(output_folder, pet_tracer + f"{modality}_series{idx}.nii.gz")
                 sitk.WriteImage(image, output_path)
-                print(f"  ✓ 备用方案成功!")
+                # print(f"  ✓ 备用方案成功!")
                 
             except Exception as e2:
-                print(f"  ✗ 备用方案也失败: {e2}")
+                # print(f"  ✗ 备用方案也失败: {e2}")
                 continue
     
-    print(f"\n完成! 结果保存在: {output_folder}")
+    # print(f"\n完成! 结果保存在: {output_folder}")
