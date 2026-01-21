@@ -7,6 +7,7 @@ from pathlib import Path
 # personal imports
 from Inference_TS import inference_ts
 from Dicom2Nii import separate_dicom_modalities
+from cropAintensiry import 
 
 output_dir = '/data/xiangcen/pet_gen/processed/batch1'
 
@@ -89,4 +90,10 @@ def seperate_psma_dir(patient_dir):
     return psma_dir, fdg_dir
 
 
-process_zip_files('/data/xiangcen/pet_gen/pressed')
+
+
+# process all zip/rar files and saved to one place
+process_zip_files()
+# inference using totalsegmentator
+
+# crop and intensity range then convert to h5

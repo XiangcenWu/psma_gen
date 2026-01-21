@@ -8,7 +8,7 @@ from Training.DDPM_Baseline import *
 
 
 
-device='cpu'
+device='cuda:0'
 
 diffusion = CTtoPETDiffusion(device=device)
 
@@ -19,11 +19,11 @@ patients = [os.path.join(base_dir, patient_name, 'data_h5.h5') for patient_name 
 train_loader = create_data_loader(patients, ReadH5d(), batch_size=2)
 
 for batch in train_loader:
-    psma_ct_tensor = batch['psma_ct'].to(device)
-    psma_pt_tensor = batch['psma_pt'].to(device)
+    psma_ct_tensor = batch['psma_ct']
+    psma_pt_tensor = batch['psma_pt']
 
 
-    optimizer = optim.AdamW(diffusion.model.parameters(), lr=learning_rate)
+    optimizer = optim.AdamW(diffusion.model.parameters(), lr=1e-4)
     diffusion.train_step(psma_ct_tensor, psma_pt_tensor, optimizer)
 
     break

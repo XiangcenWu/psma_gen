@@ -66,21 +66,19 @@ class DDPMScheduler:
 
 
 class CTtoPETDiffusion:
-    """CT到PET的条件扩散模型"""
+
     def __init__(
         self,
         spatial_dims=3,
-        in_channels=2,  # CT + noisy PET
-        out_channels=1,  # 预测的噪声
-        num_res_blocks=2,
-        channels=(64, 128, 256, 512),
-        attention_levels=(False, True, True, True),
+        in_channels=2,
+        out_channels=1,
+        num_res_blocks=1,           # 减少残差块
+        channels=(8, 8),          # 只有2层！
+        attention_levels=(False, False),  # 长度=2
         num_train_timesteps=1000,
         device='cuda'
     ):
         self.device = device
-        
-        # 初始化UNet
         self.model = DiffusionModelUNet(
             spatial_dims=spatial_dims,
             in_channels=in_channels,
@@ -88,14 +86,17 @@ class CTtoPETDiffusion:
             num_res_blocks=num_res_blocks,
             channels=channels,
             attention_levels=attention_levels,
-            norm_num_groups=32,
-            with_conditioning=False,  # 不使用cross-attention
+            norm_num_groups=8,       # 必须整除最小 channel (16)
+            with_conditioning=False,
             resblock_updown=True,
-            num_head_channels=32,
+            num_head_channels=8,     # 虽然不用 attention，但需设小值
+            
+            use_flash_attention = True
         ).to(device)
-        
+        print(count_parameters(model=self.model))
         # 初始化调度器
         self.scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
+        self.device=device
         
     def train_step(self, ct_images, pet_images, optimizer):
         """单步训练"""
@@ -104,8 +105,7 @@ class CTtoPETDiffusion:
         
         # 随机采样时间步
         timesteps = torch.randint(
-            0, self.scheduler.num_train_timesteps, (batch_size,),
-            device=self.device
+            0, self.scheduler.num_train_timesteps, (batch_size,)
         ).long()
         
         # 生成随机噪声
@@ -118,10 +118,10 @@ class CTtoPETDiffusion:
         model_input = torch.cat([ct_images, noisy_pet], dim=1)
         
         # 预测噪声
-        noise_pred = self.model(model_input, timesteps)
+        noise_pred = self.model(model_input.to(self.device), timesteps.to(self.device))
         
         # 计算损失（MSE）
-        loss = nn.functional.mse_loss(noise_pred, noise)
+        loss = nn.functional.mse_loss(noise_pred, noise.to(self.device))
         
         # 反向传播
         optimizer.zero_grad()
@@ -287,6 +287,9 @@ def inference(ct_images, model_path, num_inference_steps=50, device='cuda'):
     return generated_pet.cpu().numpy()
 
 
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 # 使用示例
 if __name__ == "__main__":
     """
