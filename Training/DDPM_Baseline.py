@@ -6,8 +6,7 @@ from tqdm import tqdm
 import numpy as np
 from pathlib import Path
 
-# 假设你已经导入了DiffusionModelUNet
-# from diffusion_model_unet import DiffusionModelUNet
+from monai.networks.nets import DiffusionModelUNet
 
 
 class DDPMScheduler:

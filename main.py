@@ -4,7 +4,14 @@ import os
 from Training.data_loader import create_data_loader, ReadH5d
 
 
-device = 'cuda:0'
+from Training.DDPM_Baseline import *
+
+
+
+device='cpu'
+
+diffusion = CTtoPETDiffusion(device=device)
+
 
 base_dir = '/data/xiangcen/pet_gen/processed/batch1'
 
@@ -15,4 +22,9 @@ for batch in train_loader:
     psma_ct_tensor = batch['psma_ct'].to(device)
     psma_pt_tensor = batch['psma_pt'].to(device)
 
+
+    optimizer = optim.AdamW(diffusion.model.parameters(), lr=learning_rate)
+    diffusion.train_step(psma_ct_tensor, psma_pt_tensor, optimizer)
+
+    break
 
