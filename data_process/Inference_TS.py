@@ -2,7 +2,6 @@ import os
 from totalsegmentator.python_api import totalsegmentator
 from tqdm import tqdm
 
-os.environ["TOTALSEG_WEIGHTS_PATH"] = '/data/xiangcen/TotalSegmentator'
 
 
 def inference_ts(ct_dir, output_dir, task='body'):
