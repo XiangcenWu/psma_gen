@@ -29,6 +29,7 @@ if __name__ == '__main__':
         fdgCT_mask_dir = os.path.join(patients_dir, patient_dir, fdgCT_mask_name)
         psmaCT_mask_dir = os.path.join(patients_dir, patient_dir, psmaCT_mask_name)
 
-
+        if os.path.exists(fdgCT_mask_dir) and os.path.exists(psmaCT_mask_dir):
+            continue
         inference_ts(fdgCT_dir, fdgCT_mask_dir, task='appendicular_bones')
         inference_ts(psmaCT_dir, psmaCT_mask_dir, task='appendicular_bones')
