@@ -48,28 +48,64 @@ def read_nii_tensor(itk_image: sitk.Image):
 def save_h5(file_name: str,
             fdg_ct_tensor: torch.tensor,
             fdg_pt_tensor: torch.tensor,
+            fdg_mask_tensor: torch.tensor,
             psma_ct_tensor: torch.tensor,
-            psma_pt_tensor: torch.tensor):
+            psma_pt_tensor: torch.tensor,
+            psma_mask_tensor: torch.tensor,
+            ):
 
     with h5py.File(file_name, 'w') as h5_file:
         h5_file.create_dataset('fdg_ct', data=fdg_ct_tensor)
         h5_file.create_dataset('fdg_pt', data=fdg_pt_tensor)
-        
+        h5_file.create_dataset('fdg_mask', data=fdg_mask_tensor)
+
+
         h5_file.create_dataset('psma_ct', data=psma_ct_tensor)
         h5_file.create_dataset('psma_pt', data=psma_pt_tensor)
-        
-        
+        h5_file.create_dataset('psma_mask', data=psma_mask_tensor)
         
 
+        
+def fusion_ts_mask(total_mask_tensor, appendicular_bones_mask_tensor):
+    assert total_mask_tensor.shape == appendicular_bones_mask_tensor.shape
 
-def crop_and_intensity(patient_dir):
+    invalid = (app > 11)
+    if invalid.any():
+        raise ValueError("appendicular_bones_mask_tensor contains labels > 11")
+    # ---- 1. dtype 检查 & 统一 ----
+    # if total_mask_tensor.dtype != torch.int16:
+    total_mask_tensor = total_mask_tensor.to(torch.int16)
 
-    print(f'cropping and intensity range to {patient_dir}')
+# if appendicular_bones_mask_tensor.dtype != torch.int16:
+    appendicular_bones_mask_tensor = appendicular_bones_mask_tensor.to(torch.int16)
+
+    # ---- 2. 复制 total 作为输出 ----
+    fused = total_mask_tensor.clone()
+
+    # ---- 3. remap appendicular bones: 1–11 -> 118–128 ----
+    app = appendicular_bones_mask_tensor
+
+    mask = (app >= 1) & (app <= 11)
+    remapped_app = torch.zeros_like(app, dtype=torch.int16)
+    remapped_app[mask] = app[mask] + 117
+
+    # ---- 4. 融合（appendicular 覆盖 total）----
+    fused[mask] = remapped_app[mask]
+
+    return fused
+
+
+def crop_and_intensity(patient_dir, psma_total_mask, fdg_total_mask, 
+                    psma_app_mask, fdg_app_mask,
+                    save_dir, img_size):
+
 
     patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
 
     
-    for dir in tqdm(patient_dir, desc="cropping and intensity range", unit="case"):
+    for idx, dir in enumerate(tqdm(patient_dir, desc="cropping and intensity range", unit="case")):
+
+        patient_name = f"patient_{idx:04d}.h5"
         
         fdg_ct = read_nii(os.path.join(dir, 'fdgCT_series2.nii.gz'))
         psma_ct = read_nii(os.path.join(dir, 'psmaCT_series2.nii.gz'))  
@@ -77,8 +113,14 @@ def crop_and_intensity(patient_dir):
         fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
         psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
 
-        fdg_mask = read_nii(os.path.join(dir, 'fdgCT_body_mask.nii.gz'))
-        psma_mask = read_nii(os.path.join(dir, 'psmaCT_body_mask.nii.gz'))
+        fdg_total_mask = read_nii_tensor(read_nii(os.path.join(dir, fdg_total_mask)))
+        psma_total_mask = read_nii_tensor(read_nii(os.path.join(dir, psma_total_mask)))
+
+        fdg_app_mask = read_nii_tensor(read_nii(os.path.join(dir, fdg_app_mask)))
+        psma_app_mask = read_nii_tensor(read_nii(os.path.join(dir, psma_app_mask)))
+
+        fdg_mask = fusion_ts_mask(fdg_total_mask, fdg_app_mask)
+        psma_mask = fusion_ts_mask(psma_total_mask, psma_app_mask)
         
         # resample PTs to CTs
         fdg_pt = sitk.Resample(fdg_pt, fdg_ct, sitk.Transform(), sitk.sitkLinear)
@@ -91,8 +133,7 @@ def crop_and_intensity(patient_dir):
         fdg_pt = read_nii_tensor(fdg_pt)   
         psma_pt = read_nii_tensor(psma_pt)
 
-        fdg_mask = read_nii_tensor(fdg_mask)
-        psma_mask = read_nii_tensor(psma_mask)
+        
 
 
         fdg_ct = cropAbyB(fdg_ct, fdg_mask)
@@ -106,23 +147,42 @@ def crop_and_intensity(patient_dir):
 
 
         scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
-        resizer = Resize((128, 128, 384), mode="trilinear")
-        resizer_mask = Resize((128, 128, 384), mode="nearest-exact")
+        resizer = Resize(img_size, mode="trilinear")
+        resizer_mask = Resize(img_size, mode="nearest-exact")
 
 
 
         fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
         fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
+        fdg_mask = resizer_mask(fdg_mask.unsqueeze(0))
 
 
         psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
         psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
+        psma_mask = resizer_mask(psma_mask.unsqueeze(0))
+
+
+
         
         
         save_h5(
-            os.path.join(dir, 'data_h5.h5'),
+            os.path.join(save_dir, patient_name),
             fdg_ct,
             fdg_pt,
+            fdg_mask,
             psma_ct,
-            psma_pt
+            psma_pt,
+            psma_mask
         )
+
+
+
+if __name__ == "__main__":
+
+    crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
+    psma_total_mask='psmaCT_total_mask.nii.gz',
+    fdg_total_mask='fdgCT_total_mask.nii.gz',
+    psma_app_mask='psmaCT_appendicular_bones_mask.nii.gz',
+    fdg_app_mask='fdgCT_appendicular_bones_mask.nii.gz',
+    save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
+    img_size=(128, 128, 384))
