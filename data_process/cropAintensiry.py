@@ -95,8 +95,7 @@ def fusion_ts_mask(total_mask_tensor, appendicular_bones_mask_tensor):
     return fused
 
 
-def crop_and_intensity(patient_dir, psma_total_mask, fdg_total_mask, 
-                    psma_app_mask, fdg_app_mask,
+def crop_and_intensity(patient_dir,
                     save_dir, img_size):
 
 
@@ -113,11 +112,17 @@ def crop_and_intensity(patient_dir, psma_total_mask, fdg_total_mask,
         fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
         psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
 
-        fdg_total_mask = read_nii(os.path.join(dir, fdg_total_mask))
-        psma_total_mask = read_nii(os.path.join(dir, psma_total_mask))
 
-        fdg_app_mask = read_nii(os.path.join(dir, fdg_app_mask))
-        psma_app_mask = read_nii(os.path.join(dir, psma_app_mask))
+    #         psma_total_mask='psmaCT_total_mask.nii.gz',
+    # fdg_total_mask='fdgCT_total_mask.nii.gz',
+    # psma_app_mask='psmaCT_appendicular_bones_mask.nii.gz',
+    # fdg_app_mask='fdgCT_appendicular_bones_mask.nii.gz',
+
+        fdg_total_mask = read_nii(os.path.join(dir, 'fdgCT_total_mask.nii.gz'))
+        psma_total_mask = read_nii(os.path.join(dir, 'psmaCT_total_mask.nii.gz'))
+
+        fdg_app_mask = read_nii(os.path.join(dir, 'fdgCT_appendicular_bones_mask.nii.gz'))
+        psma_app_mask = read_nii(os.path.join(dir, 'psmaCT_appendicular_bones_mask.nii.gz'))
 
         fdg_mask = fusion_ts_mask(read_nii_tensor(fdg_total_mask), read_nii_tensor(fdg_app_mask))
         psma_mask = fusion_ts_mask(read_nii_tensor(psma_total_mask), read_nii_tensor(psma_app_mask))
@@ -180,9 +185,5 @@ def crop_and_intensity(patient_dir, psma_total_mask, fdg_total_mask,
 if __name__ == "__main__":
 
     crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
-    psma_total_mask='psmaCT_total_mask.nii.gz',
-    fdg_total_mask='fdgCT_total_mask.nii.gz',
-    psma_app_mask='psmaCT_appendicular_bones_mask.nii.gz',
-    fdg_app_mask='fdgCT_appendicular_bones_mask.nii.gz',
     save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
     img_size=(128, 128, 384))
