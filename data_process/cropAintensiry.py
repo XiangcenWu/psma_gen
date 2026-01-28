@@ -69,7 +69,7 @@ def save_h5(file_name: str,
 def fusion_ts_mask(total_mask_tensor, appendicular_bones_mask_tensor):
     assert total_mask_tensor.shape == appendicular_bones_mask_tensor.shape
 
-    invalid = (app > 11)
+    invalid = (appendicular_bones_mask_tensor > 11)
     if invalid.any():
         raise ValueError("appendicular_bones_mask_tensor contains labels > 11")
     # ---- 1. dtype 检查 & 统一 ----
