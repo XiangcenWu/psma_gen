@@ -113,14 +113,14 @@ def crop_and_intensity(patient_dir, psma_total_mask, fdg_total_mask,
         fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
         psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
 
-        fdg_total_mask = read_nii_tensor(read_nii(os.path.join(dir, fdg_total_mask)))
-        psma_total_mask = read_nii_tensor(read_nii(os.path.join(dir, psma_total_mask)))
+        fdg_total_mask = read_nii(os.path.join(dir, fdg_total_mask))
+        psma_total_mask = read_nii(os.path.join(dir, psma_total_mask))
 
-        fdg_app_mask = read_nii_tensor(read_nii(os.path.join(dir, fdg_app_mask)))
-        psma_app_mask = read_nii_tensor(read_nii(os.path.join(dir, psma_app_mask)))
+        fdg_app_mask = read_nii(os.path.join(dir, fdg_app_mask))
+        psma_app_mask = read_nii(os.path.join(dir, psma_app_mask))
 
-        fdg_mask = fusion_ts_mask(fdg_total_mask, fdg_app_mask)
-        psma_mask = fusion_ts_mask(psma_total_mask, psma_app_mask)
+        fdg_mask = fusion_ts_mask(read_nii_tensor(fdg_total_mask), read_nii_tensor(fdg_app_mask))
+        psma_mask = fusion_ts_mask(read_nii_tensor(psma_total_mask), read_nii_tensor(psma_app_mask))
         
         # resample PTs to CTs
         fdg_pt = sitk.Resample(fdg_pt, fdg_ct, sitk.Transform(), sitk.sitkLinear)
