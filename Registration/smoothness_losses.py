@@ -1,5 +1,9 @@
+import torch
 
 
+
+def gradient_txyz(Txyz, fn):
+    return torch.stack([fn(Txyz[:, i, ...]) for i in [0, 1, 2]], axis=1)
 
 
 

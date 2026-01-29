@@ -32,14 +32,14 @@ train_transform = ReadH5d()
 
 train_list, test_list = split_train_test('/data1/xiangcen/data/pet_gen/processed/batch1_h5')
 
-train_loader = create_data_loader(train_list, train_transform)
+train_loader = create_data_loader(train_list, train_transform, batch_size=2)
 test_loader = create_data_loader(test_list, train_transform)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
 identity_grid = make_identity_grid_m11((128, 128, 384), device=device)
 
-for b in range(500):
+for b in range(200):
 
     loss_batch = train_batch(model, train_loader, optimizer, loss_function, identity_grid)
     print(loss_batch)
