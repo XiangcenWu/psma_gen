@@ -27,7 +27,7 @@ model = SwinUNETR(
 
 train_transform = ReadH5d()
 
-train_list, test_list = split_train_test('/data/xiangcen/pet_gen/processed/batch1_h5')
+train_list, test_list = split_train_test('/data1/xiangcen/pet_gen/processed/batch1_h5')
 
 train_loader = create_data_loader(train_list, train_transform)
 test_loader = create_data_loader(test_list, train_transform)
@@ -41,4 +41,4 @@ for b in range(500):
     loss_batch = train_batch(model, train_loader, optimizer, loss_function, identity_grid)
     print(loss_batch)
 
-    torch.save(model.state_dict(), '/data/xiangcen/models/pet_gen/registration/baseline.ptm')
+    torch.save(model.state_dict(), '/data1/xiangcen/models/registration/baseline.ptm')
