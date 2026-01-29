@@ -8,6 +8,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from monai.networks.nets import SwinUNETR
 from General.data_loader import create_data_loader, ReadH5d
 from monai.losses import DiceLoss
+import torch.nn as nn
+
 from General.dataset_sample import split_train_test
 from Registration.training import train_batch, make_identity_grid_m11
 
@@ -15,11 +17,12 @@ from Registration.training import train_batch, make_identity_grid_m11
 def main(args):
     device = args.device
 
-    loss_function = DiceLoss(
-        to_onehot_y=False,
-        softmax=False,
-        include_background=False
-    )
+    # loss_function = DiceLoss(
+    #     to_onehot_y=False,
+    #     softmax=False,
+    #     include_background=False
+    # )
+    loss_function = nn.MSELoss()
 
     model = SwinUNETR(
         in_channels=2,
