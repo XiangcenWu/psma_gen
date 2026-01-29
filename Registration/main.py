@@ -41,7 +41,7 @@ identity_grid = make_identity_grid_m11((128, 128, 384), device=device)
 
 for b in range(200):
 
-    loss_batch = train_batch(model, train_loader, optimizer, loss_function, identity_grid)
+    loss_batch = train_batch(model, train_loader, optimizer, loss_function, identity_grid, smoothness_lambda=10)
     print(loss_batch)
 
-    torch.save(model.state_dict(), '/data1/xiangcen/models/registration/baseline.ptm')
+    torch.save(model.state_dict(), '/data1/xiangcen/models/registration/baseline_l10.ptm')
