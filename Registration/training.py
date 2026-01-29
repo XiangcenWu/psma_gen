@@ -56,7 +56,7 @@ def train_batch(
     loss_a = 0.
 
 
-    for batch in dataloader:
+    for batch in loader:
         # Option A: Manual unpacking to specific variable names
         if cross_modality_loss:
             fdg_ct = batch['fdg_ct'].to(device)
@@ -83,6 +83,7 @@ def train_batch(
         ddf = model(input)
         ddf = torch.tanh(ddf)
         grid = identity_grid + ddf
+        grid = grid.permute(0, 2, 3, 4, 1)
 
         warped_moving = torch.nn.functional.grid_sample(fdg_mask, grid)
 

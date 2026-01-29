@@ -20,7 +20,6 @@ loss_function = DiceLoss(
 )
 
 model = SwinUNETR(
-    img_size = (128, 128, 384),
     in_channels = 2,
     out_channels = 3,
     depths = (2, 2, 2, 2),
@@ -31,7 +30,7 @@ model = SwinUNETR(
 
 train_transform = ReadH5d()
 
-train_list, test_list = split_train_test('/data1/xiangcen/pet_gen/processed/batch1_h5')
+train_list, test_list = split_train_test('/data1/xiangcen/data/pet_gen/processed/batch1_h5')
 
 train_loader = create_data_loader(train_list, train_transform)
 test_loader = create_data_loader(test_list, train_transform)

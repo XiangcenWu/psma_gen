@@ -28,7 +28,7 @@ def sample_labels_to_binary(mask, num_samples, background=0):
     binary_mask = torch.isin(mask, selected_labels)
     binary_mask = binary_mask.to(mask.dtype)
 
-    return binary_mask, selected_labels
+    return binary_mask
 
 
 
