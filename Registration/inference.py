@@ -1,3 +1,7 @@
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
 from Registration.mask import sample_labels_to_binary
 from Registration.smoothness_losses import l2_gradient
 

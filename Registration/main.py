@@ -1,3 +1,6 @@
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from monai.networks.nets import SwinUNETR
 from General.data_loader import create_data_loader, ReadH5d
 
