@@ -22,9 +22,11 @@ for batch in train_loader:
     psma_ct_tensor = batch['psma_ct']
     psma_pt_tensor = batch['psma_pt']
 
+    print(psma_ct_tensor.shape)
 
-    optimizer = optim.AdamW(diffusion.model.parameters(), lr=1e-4)
-    diffusion.train_step(psma_ct_tensor, psma_pt_tensor, optimizer)
+
+    # optimizer = optim.AdamW(diffusion.model.parameters(), lr=1e-4)
+    # diffusion.train_step(psma_ct_tensor, psma_pt_tensor, optimizer)
 
     break
 

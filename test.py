@@ -1,35 +1,30 @@
-import os
-from totalsegmentator.python_api import totalsegmentator
-from tqdm import tqdm
+import torch
+
+def make_identity_grid_m11(spatial_size, device=None, dtype=torch.float32):
+    """
+    Create an identity grid normalized to [-1, 1] for grid_sample
+    (align_corners=True).
+
+    Args:
+        spatial_size: tuple like (D, H, W) or (H, W)
+
+    Returns:
+        grid: shape (1, ndim, *spatial_size)
+              order: (x, y, z, ...)
+    """
+    coords = torch.meshgrid(
+        *[
+            torch.linspace(-1.0, 1.0, s, device=device, dtype=dtype)
+            if s > 1 else torch.zeros(1, device=device, dtype=dtype)
+            for s in spatial_size
+        ],
+        indexing="ij"
+    )
+
+    # (z, y, x) → (x, y, z)
+    grid = torch.stack(coords[::-1], dim=0)
+
+    return grid.unsqueeze(0)
 
 
-
-def inference_ts(ct_dir, output_dir, task='body'):
-    totalsegmentator(ct_dir, output_dir, ml=True, task=task)
-
-
-
-if __name__ == '__main__':
-
-    fdgCT_name = 'fdgCT_series2.nii.gz'
-    psmaCT_name = 'psmaCT_series2.nii.gz'
-
-    fdgCT_mask_name = 'fdgCT_appendicular_bones_mask.nii.gz'
-    psmaCT_mask_name = 'psmaCT_appendicular_bones_mask.nii.gz'
-
-
-    patients_dir = '/data/xiangcen/pet_gen/processed/batch1'
-
-    for patient_dir in tqdm(os.listdir(patients_dir), desc='Get Ct appendicular_bones Mask', unit='case'):
-        print(patient_dir)
-
-        fdgCT_dir = os.path.join(patients_dir, patient_dir, fdgCT_name)
-        psmaCT_dir = os.path.join(patients_dir, patient_dir, psmaCT_name)
-
-        fdgCT_mask_dir = os.path.join(patients_dir, patient_dir, fdgCT_mask_name)
-        psmaCT_mask_dir = os.path.join(patients_dir, patient_dir, psmaCT_mask_name)
-
-        if os.path.exists(fdgCT_mask_dir) and os.path.exists(psmaCT_mask_dir):
-            continue
-        inference_ts(fdgCT_dir, fdgCT_mask_dir, task='appendicular_bones')
-        inference_ts(psmaCT_dir, psmaCT_mask_dir, task='appendicular_bones')
+print(make_identity_grid_m11((2, 3, 5))[0, 0])
