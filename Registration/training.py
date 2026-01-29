@@ -43,7 +43,7 @@ def train_batch(
         loss_function,
         identity_grid,
         smoothness_lambda=1000,
-        mask_per_iteration=30,
+        mask_per_iteration=50,
         cross_modality_loss=False,
         device="cuda:0"
     ):
@@ -82,14 +82,20 @@ def train_batch(
 
         ddf = model(input)
         ddf = torch.tanh(ddf)
+
+        #claculate smoothness loss first hand 
+        smoothness_loss = smoothness_lambda*l2_gradient(ddf)
+
         grid = identity_grid + ddf
         grid = grid.permute(0, 2, 3, 4, 1)
 
         warped_moving = torch.nn.functional.grid_sample(fdg_mask, grid)
 
-        
-        loss = loss_function(psma_mask, fdg_mask) + smoothness_lambda*l2_gradient(ddf)
-
+        if cross_modality_loss:
+            warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
+            loss = loss_function(psma_mask, fdg_mask) + loss_function(warped_moving_ct, psma_ct) + smoothness_loss
+        else:
+            loss = loss_function(psma_mask, fdg_mask) + smoothness_loss
 
         loss.backward()
         optimizer.step()

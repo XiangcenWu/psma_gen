@@ -50,7 +50,11 @@ def inference_batch(
 
 
         ddf = model(input)
+        ddf = torch.tanh(ddf)
         grid = identity_grid + ddf
+
+
+        wrapped_moving = 
 
 
 
