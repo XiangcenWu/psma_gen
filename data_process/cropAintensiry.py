@@ -41,8 +41,14 @@ def read_nii(file_dir):
     return itk_image
 
 def read_nii_tensor(itk_image: sitk.Image):
+    """
+    Returns tensor in (x, y, z) order to match SimpleITK spacing
+    """
     img_array = sitk.GetArrayFromImage(itk_image)
-    return torch.from_numpy(img_array).permute(1, 2, 0).float()
+    return torch.from_numpy(img_array).permute(2, 1, 0).float()
+
+def get_nii_vd(itk_image: sitk.Image):
+    return itk_image.GetSpacing()
 
 
 def save_h5(file_name: str,
@@ -95,8 +101,30 @@ def fusion_ts_mask(total_mask_tensor, appendicular_bones_mask_tensor):
     return fused
 
 
+
+
+def compute_new_voxel_dimension(
+        old_spacing,   # (sx, sy, sz)
+        old_size,      # (nx, ny, nz)
+        new_size       # (nx', ny', nz')
+    ):
+    """
+    Calculate new voxel dimensions after resizing,
+    assuming physical size (FOV) is preserved.
+
+    Returns:
+        new_spacing: (sx', sy', sz')
+    """
+    new_spacing = tuple(
+        old_spacing[i] * old_size[i] / new_size[i]
+        for i in range(3)
+    )
+    return new_spacing
+
+
+
 def crop_and_intensity(patient_dir,
-                    save_dir, img_size):
+                    save_dir, img_size=(128, 128, 384)):
 
 
     patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
@@ -111,15 +139,15 @@ def crop_and_intensity(patient_dir,
 
         fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
         psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
+        # get the voxel dimension of psma_ct
+        psma_ct_voxel_dim = get_nii_vd(psma_ct)
+        fdg_ct_voxel_dim = get_nii_vd(fdg_ct)
 
 
-    #         psma_total_mask='psmaCT_total_mask.nii.gz',
-    # fdg_total_mask='fdgCT_total_mask.nii.gz',
-    # psma_app_mask='psmaCT_appendicular_bones_mask.nii.gz',
-    # fdg_app_mask='fdgCT_appendicular_bones_mask.nii.gz',
 
         fdg_total_mask = read_nii(os.path.join(dir, 'fdgCT_total_mask.nii.gz'))
         psma_total_mask = read_nii(os.path.join(dir, 'psmaCT_total_mask.nii.gz'))
+
 
         fdg_app_mask = read_nii(os.path.join(dir, 'fdgCT_appendicular_bones_mask.nii.gz'))
         psma_app_mask = read_nii(os.path.join(dir, 'psmaCT_appendicular_bones_mask.nii.gz'))
@@ -130,55 +158,62 @@ def crop_and_intensity(patient_dir,
         # resample PTs to CTs
         fdg_pt = sitk.Resample(fdg_pt, fdg_ct, sitk.Transform(), sitk.sitkLinear)
         psma_pt = sitk.Resample(psma_pt, psma_ct, sitk.Transform(), sitk.sitkLinear)
-        
-        
-        fdg_ct = read_nii_tensor(fdg_ct)
-        psma_ct = read_nii_tensor(psma_ct)  
+        # get the voxel dimension of psma_ct
+        psma_pt_voxel_dim = get_nii_vd(psma_pt)
+        fdg_pt_voxel_dim = get_nii_vd(fdg_pt)
 
-        fdg_pt = read_nii_tensor(fdg_pt)   
-        psma_pt = read_nii_tensor(psma_pt)
+        print(psma_pt_voxel_dim, psma_ct_voxel_dim, fdg_pt_voxel_dim, fdg_ct_voxel_dim)
 
-        
-
-
-        fdg_ct = cropAbyB(fdg_ct, fdg_mask)
-        fdg_pt = cropAbyB(fdg_pt, fdg_mask)
-        fdg_mask = cropAbyB(fdg_mask, fdg_mask)
-
-        psma_ct = cropAbyB(psma_ct, psma_mask)
-        psma_pt = cropAbyB(psma_pt, psma_mask)
-        psma_mask = cropAbyB(psma_mask, psma_mask)
-
-
-
-        scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
-        resizer = Resize(img_size, mode="trilinear")
-        resizer_mask = Resize(img_size, mode="nearest-exact")
-
-
-
-        fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
-        fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
-        fdg_mask = resizer_mask(fdg_mask.unsqueeze(0))
-
-
-        psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
-        psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
-        psma_mask = resizer_mask(psma_mask.unsqueeze(0))
-
-
+        # print(compute_new_voxel_dimension(psma_pt_voxel_dim, ))
 
         
+        # fdg_ct = read_nii_tensor(fdg_ct)
+        # psma_ct = read_nii_tensor(psma_ct)  
+
+        # fdg_pt = read_nii_tensor(fdg_pt)   
+        # psma_pt = read_nii_tensor(psma_pt)
+
         
-        save_h5(
-            os.path.join(save_dir, patient_name),
-            fdg_ct,
-            fdg_pt,
-            fdg_mask,
-            psma_ct,
-            psma_pt,
-            psma_mask
-        )
+
+        # # cropping by mask
+        # fdg_ct = cropAbyB(fdg_ct, fdg_mask)
+        # fdg_pt = cropAbyB(fdg_pt, fdg_mask)
+        # fdg_mask = cropAbyB(fdg_mask, fdg_mask)
+
+        # psma_ct = cropAbyB(psma_ct, psma_mask)
+        # psma_pt = cropAbyB(psma_pt, psma_mask)
+        # psma_mask = cropAbyB(psma_mask, psma_mask)
+
+
+
+        # scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
+        # resizer = Resize(img_size, mode="trilinear")
+        # resizer_mask = Resize(img_size, mode="nearest-exact")
+
+
+
+        # fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
+        # fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
+        # fdg_mask = resizer_mask(fdg_mask.unsqueeze(0))
+
+
+        # psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
+        # psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
+        # psma_mask = resizer_mask(psma_mask.unsqueeze(0))
+
+
+
+        
+        
+        # save_h5(
+        #     os.path.join(save_dir, patient_name),
+        #     fdg_ct,
+        #     fdg_pt,
+        #     fdg_mask,
+        #     psma_ct,
+        #     psma_pt,
+        #     psma_mask
+        # )
 
 
 

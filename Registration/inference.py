@@ -63,3 +63,8 @@ def inference_batch(
     loss_of_this_epoch = loss_a / step
 
     return loss_of_this_epoch
+
+
+    # change loss function dice + mse
+    # change cropAintensiry add voxel dimension
+    # write inference file get tre dice also warpped image in itk format
