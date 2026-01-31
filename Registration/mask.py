@@ -1,32 +1,9 @@
 import torch
 
 
-def sample_labels_to_binary(mask, num_samples, background=0):
-    """
-    Convert a multi-label mask into a binary mask
-    by randomly sampling labels.
-
-    Args:
-        mask: tensor (H,W) or (D,H,W), integer labels
-        num_samples: number of labels to sample
-        background: background label value
-
-    Returns:
-        binary_mask: same shape as mask, values {0,1}
-        selected_labels: tensor of sampled labels
-    """
-    labels = torch.unique(mask)
-    labels = labels[labels != background]
-
-    if labels.numel() == 0:
-        return torch.zeros_like(mask), labels
-
-    num_samples = min(num_samples, labels.numel())
-    perm = torch.randperm(labels.numel(), device=labels.device)
-    selected_labels = labels[perm[:num_samples]]
-
-    binary_mask = torch.isin(mask, selected_labels)
-    binary_mask = binary_mask.to(mask.dtype)
+def sample_labels_to_binary(mask):
+    
+    binary_mask = (mask != 0).to(mask.dtype)
 
     return binary_mask
 

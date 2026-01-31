@@ -36,11 +36,18 @@ def make_identity_grid_m11(spatial_size, device=None, dtype=torch.float32):
     return grid.unsqueeze(0)
 
 
+
+loss_function_dice = DiceLoss(
+    to_onehot_y=False,
+    softmax=False,
+    include_background=False
+)
+loss_function_mse = nn.MSELoss()
+
 def train_batch(
         model, 
         loader,
         optimizer,
-        loss_function,
         identity_grid,
         smoothness_lambda=1000,
         mask_per_iteration=50,
@@ -93,9 +100,9 @@ def train_batch(
 
         if cross_modality_loss:
             warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-            loss = loss_function(psma_mask, fdg_mask) + loss_function(warped_moving_ct, psma_ct) + smoothness_loss
+            loss = loss_function_dice(psma_mask, fdg_mask) + loss_function(warped_moving_ct, psma_ct) + smoothness_loss
         else:
-            loss = loss_function(psma_mask, fdg_mask) + smoothness_loss
+            loss = loss_function_dice(psma_mask, fdg_mask) + smoothness_loss
 
         loss.backward()
         optimizer.step()

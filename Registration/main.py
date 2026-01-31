@@ -17,13 +17,6 @@ from Registration.training import train_batch, make_identity_grid_m11
 def main(args):
     device = args.device
 
-    # loss_function = DiceLoss(
-    #     to_onehot_y=False,
-    #     softmax=False,
-    #     include_background=False
-    # )
-    loss_function = nn.MSELoss()
-
     model = SwinUNETR(
         in_channels=2,
         out_channels=3,
@@ -65,7 +58,6 @@ def main(args):
             model,
             train_loader,
             optimizer,
-            loss_function,
             identity_grid,
             smoothness_lambda=args.smoothness,
             mask_per_iteration=args.mask_per_iteration,
