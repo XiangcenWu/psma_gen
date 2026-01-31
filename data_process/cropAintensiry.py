@@ -58,6 +58,8 @@ def save_h5(file_name: str,
             psma_ct_tensor: torch.tensor,
             psma_pt_tensor: torch.tensor,
             psma_mask_tensor: torch.tensor,
+            fdg_spacing: tuple,
+            psma_spacing: tuple,
             ):
 
     with h5py.File(file_name, 'w') as h5_file:
@@ -69,6 +71,9 @@ def save_h5(file_name: str,
         h5_file.create_dataset('psma_ct', data=psma_ct_tensor)
         h5_file.create_dataset('psma_pt', data=psma_pt_tensor)
         h5_file.create_dataset('psma_mask', data=psma_mask_tensor)
+
+        h5_file.attrs['fdg_spacing'] = fdg_spacing
+        h5_file.attrs['psma_spacing'] = psma_spacing
         
 
         
@@ -211,34 +216,36 @@ def crop_and_intensity(patient_dir,
 
 
 
-        # scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
-        # resizer = Resize(img_size, mode="trilinear")
-        # resizer_mask = Resize(img_size, mode="nearest-exact")
+        scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
+        resizer = Resize(img_size, mode="trilinear")
+        resizer_mask = Resize(img_size, mode="nearest-exact")
 
 
 
-        # fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
-        # fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
-        # fdg_mask = resizer_mask(fdg_mask.unsqueeze(0))
+        fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
+        fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
+        fdg_mask = resizer_mask(fdg_mask.unsqueeze(0))
 
 
-        # psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
-        # psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
-        # psma_mask = resizer_mask(psma_mask.unsqueeze(0))
+        psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
+        psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
+        psma_mask = resizer_mask(psma_mask.unsqueeze(0))
 
 
 
         
         
-        # save_h5(
-        #     os.path.join(save_dir, patient_name),
-        #     fdg_ct,
-        #     fdg_pt,
-        #     fdg_mask,
-        #     psma_ct,
-        #     psma_pt,
-        #     psma_mask
-        # )
+        save_h5(
+            os.path.join(save_dir, patient_name),
+            fdg_ct,
+            fdg_pt,
+            fdg_mask,
+            psma_ct,
+            psma_pt,
+            psma_mask,
+            fdg_spacing,
+            psma_spacing
+        )
 
 
 

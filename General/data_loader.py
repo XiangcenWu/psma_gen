@@ -24,6 +24,9 @@ def load_h5(file_name: str):
         psma_pt = torch.from_numpy(h5_file['psma_pt'][:])
         psma_mask = torch.from_numpy(h5_file['psma_mask'][:])
 
+        fdg_spacing = tuple(h5_file.attrs['fdg_spacing'])
+        psma_spacing = tuple(h5_file.attrs['psma_spacing'])
+
     return (
         fdg_ct,
         fdg_pt,
@@ -31,6 +34,8 @@ def load_h5(file_name: str):
         psma_ct,
         psma_pt,
         psma_mask,
+        fdg_spacing,
+        psma_spacing
     )
 
 
@@ -39,7 +44,8 @@ def read_h5_to_dict(file_name: str):
     return {'fdg_ct': h5_file[0], 'fdg_pt': h5_file[1], \
             'fdg_mask': h5_file[2], \
             'psma_ct': h5_file[3], 'psma_pt': h5_file[4], \
-            'psma_mask': h5_file[5]}
+            'psma_mask': h5_file[5], \
+            'fdg_spacing': h5_file[6], 'psma_spacing': h5_file[7]}
 
 
 
