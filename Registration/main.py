@@ -60,7 +60,6 @@ def main(args):
             optimizer,
             identity_grid,
             smoothness_lambda=args.smoothness,
-            mask_per_iteration=args.mask_per_iteration,
             cross_modality_loss=args.cross_modality_loss
         )
 
@@ -79,12 +78,6 @@ if __name__ == "__main__":
         help="Smoothness regularization weight (lambda)"
     )
 
-    parser.add_argument(
-        "--mask_per_iteration",
-        type=int,
-        default=50,
-        help="Number of masks sampled per iteration"
-    )
 
     parser.add_argument(
         "--cross_modality_loss",

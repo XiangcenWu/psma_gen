@@ -50,7 +50,6 @@ def train_batch(
         optimizer,
         identity_grid,
         smoothness_lambda=1000,
-        mask_per_iteration=50,
         cross_modality_loss=False,
         device="cuda:0"
     ):
@@ -82,8 +81,8 @@ def train_batch(
         input = torch.cat([fdg_pt, psma_pt], dim=1)
 
         # sample mask to be used to train loss
-        fdg_mask = sample_labels_to_binary(fdg_mask, mask_per_iteration)
-        psma_mask = sample_labels_to_binary(psma_mask, mask_per_iteration)
+        fdg_mask = sample_labels_to_binary(fdg_mask)
+        psma_mask = sample_labels_to_binary(psma_mask)
 
 
 
