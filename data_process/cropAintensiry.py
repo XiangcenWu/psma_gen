@@ -47,8 +47,8 @@ def read_nii_tensor(itk_image: sitk.Image):
     img_array = sitk.GetArrayFromImage(itk_image)
     return torch.from_numpy(img_array).permute(2, 1, 0).float()
 
-def get_nii_vd(itk_image: sitk.Image):
-    return itk_image.GetSpacing()
+def get_nii_spacing(itk_image: sitk.Image):
+    return tuple(itk_image.GetSpacing())
 
 
 def save_h5(file_name: str,
@@ -134,55 +134,80 @@ def crop_and_intensity(patient_dir,
 
         patient_name = f"patient_{idx:04d}.h5"
         
+        # load all ct and pt images
         fdg_ct = read_nii(os.path.join(dir, 'fdgCT_series2.nii.gz'))
         psma_ct = read_nii(os.path.join(dir, 'psmaCT_series2.nii.gz'))  
 
         fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
         psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
-        # get the voxel dimension of psma_ct
-        psma_ct_voxel_dim = get_nii_vd(psma_ct)
-        fdg_ct_voxel_dim = get_nii_vd(fdg_ct)
 
 
 
+        # get the voxel dimension of psma_ct and fdg_ct
+        psma_ct_spacing = get_nii_spacing(psma_ct)
+        fdg_ct_spacing = get_nii_spacing(fdg_ct)
+
+
+        # get the maks for both fdg and psma
         fdg_total_mask = read_nii(os.path.join(dir, 'fdgCT_total_mask.nii.gz'))
         psma_total_mask = read_nii(os.path.join(dir, 'psmaCT_total_mask.nii.gz'))
-
-
         fdg_app_mask = read_nii(os.path.join(dir, 'fdgCT_appendicular_bones_mask.nii.gz'))
         psma_app_mask = read_nii(os.path.join(dir, 'psmaCT_appendicular_bones_mask.nii.gz'))
-
         fdg_mask = fusion_ts_mask(read_nii_tensor(fdg_total_mask), read_nii_tensor(fdg_app_mask))
         psma_mask = fusion_ts_mask(read_nii_tensor(psma_total_mask), read_nii_tensor(psma_app_mask))
         
         # resample PTs to CTs
         fdg_pt = sitk.Resample(fdg_pt, fdg_ct, sitk.Transform(), sitk.sitkLinear)
         psma_pt = sitk.Resample(psma_pt, psma_ct, sitk.Transform(), sitk.sitkLinear)
-        # get the voxel dimension of psma_ct
-        psma_pt_voxel_dim = get_nii_vd(psma_pt)
-        fdg_pt_voxel_dim = get_nii_vd(fdg_pt)
+        # get the voxel dimension of fdg and psma 
+        # fdg_ct, fdt_pt / psma_ct, psma_pt
+        # spacing should be the same as it has been resampled
+        psma_pt_spacing = get_nii_spacing(psma_pt)
+        fdg_pt_spacing = get_nii_spacing(fdg_pt)
+        # print to check
+        print(psma_pt_spacing, psma_ct_spacing, fdg_pt_spacing, fdg_ct_spacing)
 
-        print(psma_pt_voxel_dim, psma_ct_voxel_dim, fdg_pt_voxel_dim, fdg_ct_voxel_dim)
+       
 
-        # print(compute_new_voxel_dimension(psma_pt_voxel_dim, ))
+        # load as pytorch tensor
+        fdg_ct = read_nii_tensor(fdg_ct)
+        psma_ct = read_nii_tensor(psma_ct)  
+        fdg_pt = read_nii_tensor(fdg_pt)
+        psma_pt = read_nii_tensor(psma_pt)
 
-        
-        # fdg_ct = read_nii_tensor(fdg_ct)
-        # psma_ct = read_nii_tensor(psma_ct)  
+        # get the size of the original tensor
+        fdg_ct_size = tuple(fdg_ct.shape)
+        psma_ct_size = tuple(psma_ct.shape)
+        fdg_pt_size = tuple(fdg_pt.shape)
+        psma_pt_size= tuple(psma_pt.shape)
 
-        # fdg_pt = read_nii_tensor(fdg_pt)   
-        # psma_pt = read_nii_tensor(psma_pt)
 
-        
 
-        # # cropping by mask
-        # fdg_ct = cropAbyB(fdg_ct, fdg_mask)
-        # fdg_pt = cropAbyB(fdg_pt, fdg_mask)
-        # fdg_mask = cropAbyB(fdg_mask, fdg_mask)
+        # cropping by mask
+        fdg_ct = cropAbyB(fdg_ct, fdg_mask)
+        fdg_pt = cropAbyB(fdg_pt, fdg_mask)
+        fdg_mask = cropAbyB(fdg_mask, fdg_mask)
 
-        # psma_ct = cropAbyB(psma_ct, psma_mask)
-        # psma_pt = cropAbyB(psma_pt, psma_mask)
-        # psma_mask = cropAbyB(psma_mask, psma_mask)
+        psma_ct = cropAbyB(psma_ct, psma_mask)
+        psma_pt = cropAbyB(psma_pt, psma_mask)
+        psma_mask = cropAbyB(psma_mask, psma_mask)
+
+        cropped_psma_size = tuple(fdg_ct.shape)
+        cropped_fdg_size = tuple(fdg_ct.shape)
+
+        psma_spacing = compute_new_voxel_dimension(
+            psma_ct_spacing,
+            psma_ct_size,
+            cropped_psma_size
+        )
+
+        fdg_spacing = compute_new_voxel_dimension(
+            fdg_ct_spacing,
+            fdg_ct_size,
+            cropped_fdg_size
+        )
+
+        print(psma_spacing, fdg_spacing)
 
 
 
