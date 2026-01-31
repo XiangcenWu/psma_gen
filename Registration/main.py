@@ -7,7 +7,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from monai.networks.nets import SwinUNETR
 from General.data_loader import create_data_loader, ReadH5d
-from monai.losses import DiceLoss
 import torch.nn as nn
 
 from General.dataset_sample import split_train_test

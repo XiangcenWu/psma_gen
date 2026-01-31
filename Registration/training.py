@@ -8,6 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Registration.mask import sample_labels_to_binary
 from Registration.smoothness_losses import l2_gradient
 
+from monai.losses import DiceLoss
 
 def make_identity_grid_m11(spatial_size, device=None, dtype=torch.float32):
     """
