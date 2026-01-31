@@ -1,6 +1,5 @@
 import torch
 
-
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -43,7 +42,7 @@ loss_function_dice = DiceLoss(
     softmax=False,
     include_background=False
 )
-loss_function_mse = nn.MSELoss()
+loss_function_mse = torch.nn.MSELoss()
 
 def train_batch(
         model, 
