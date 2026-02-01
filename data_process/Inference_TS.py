@@ -2,7 +2,7 @@ import os
 from totalsegmentator.python_api import totalsegmentator
 from tqdm import tqdm
 
-
+ To Do: convert get mask function to one function that takes arugment
 
 def inference_ts(ct_dir, output_dir, task='body'):
     totalsegmentator(ct_dir, output_dir, ml=True, task=task)
