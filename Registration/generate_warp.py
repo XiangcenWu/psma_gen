@@ -11,6 +11,7 @@ from Registration.training import train_batch, make_identity_grid_m11
 
 import SimpleITK as sitk
 import argparse
+from tqdm import tqdm
 
 
 def tensor_to_itk(tensor, spacing=None):
@@ -48,7 +49,7 @@ def generate_warp(
     os.makedirs(result_dir, exist_ok=True)
 
 
-    for i, batch in enumerate(loader):
+    for i, batch in enumerate(tqdm(loader, desc="Generating warps", total=len(loader))):
         assert batch["fdg_pt"].shape[0] == 1, \
                 f"Expected batch size 1, got {batch['fdg_pt'].shape[0]}"
 
