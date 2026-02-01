@@ -55,12 +55,12 @@ def generate_warp(
 
         fdg_pt = batch['fdg_pt'].to(device)
         fdg_mask = batch['fdg_mask'].to(device)
-        fdg_spacing = batch['fdg_spacing'][0]
+        fdg_spacing = batch['fdg_spacing']
 
         psma_pt = batch['psma_pt'].to(device)
         psma_mask = batch['psma_mask'].to(device)
-        psma_spacing = batch['psma_spacing'][0]
-
+        psma_spacing = batch['psma_spacing']
+        
 
         input = torch.cat([fdg_pt, psma_pt], dim=1)
 
@@ -86,10 +86,10 @@ def generate_warp(
         os.makedirs(sample_dir, exist_ok=True)
 
 
-        psma_pt_itk = tensor_to_itk(psma_pt, psma_spacing)
-        psma_mask_itk = tensor_to_itk(psma_mask, psma_spacing)
-        fdg_pt_warped_itk = tensor_to_itk(warped_fdg_pt, fdg_spacing)
-        fdg_mask_warped_itk = tensor_to_itk(warped_fdg_mask, fdg_spacing)
+        psma_pt_itk = tensor_to_itk(psma_pt, [t.item() for t in psma_spacing])
+        psma_mask_itk = tensor_to_itk(psma_mask, [t.item() for t in psma_spacing])
+        fdg_pt_warped_itk = tensor_to_itk(warped_fdg_pt, [t.item() for t in fdg_spacing])
+        fdg_mask_warped_itk = tensor_to_itk(warped_fdg_mask, [t.item() for t in fdg_spacing])
 
 
         sitk.WriteImage(psma_pt_itk, os.path.join(sample_dir, "psma_pt.nii.gz"))
