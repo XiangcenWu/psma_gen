@@ -72,6 +72,7 @@ def generate_warp(
         ddf = model(input)
         ddf = torch.tanh(ddf)
         grid = identity_grid + ddf
+        grid = grid.permute(0, 2, 3, 4, 1)
 
         # -----------------------------
         # warp moving images
