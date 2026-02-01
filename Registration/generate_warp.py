@@ -55,11 +55,11 @@ def generate_warp(
 
         fdg_pt = batch['fdg_pt'].to(device)
         fdg_mask = batch['fdg_mask'].to(device)
-        fdg_spacing = batch['fdg_spacing']
+        fdg_spacing = batch['fdg_spacing'][0]
 
         psma_pt = batch['psma_pt'].to(device)
         psma_mask = batch['psma_mask'].to(device)
-        psma_spacing = batch['psma_spacing']
+        psma_spacing = batch['psma_spacing'][0]
 
 
         input = torch.cat([fdg_pt, psma_pt], dim=1)
