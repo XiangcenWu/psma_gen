@@ -95,13 +95,13 @@ def train_batch(
         grid = identity_grid + ddf
         grid = grid.permute(0, 2, 3, 4, 1)
 
-        warped_moving = torch.nn.functional.grid_sample(fdg_mask, grid)
+        warped_moving_mask = torch.nn.functional.grid_sample(fdg_mask, grid)
 
         if cross_modality_loss:
             warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-            loss = loss_function_dice(psma_mask, fdg_mask) + loss_function_mse(warped_moving_ct, psma_ct) + smoothness_loss
+            loss = loss_function_dice(psma_mask, warped_moving_mask) + loss_function_mse(warped_moving_ct, psma_ct) + smoothness_loss
         else:
-            loss = loss_function_dice(psma_mask, fdg_mask) + smoothness_loss
+            loss = loss_function_dice(psma_mask, warped_moving_mask) + smoothness_loss
 
         loss.backward()
         optimizer.step()
