@@ -44,10 +44,12 @@ def main(args):
         (128, 128, 384), device=device
     )
 
+    mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
+
     if args.cross_modality_loss:
-        save_path=f'/data1/xiangcen/models/registration/baseline_l{args.smoothness}_cml.ptm'
+        save_path=f'/data1/xiangcen/models/registration/baseline_l{args.smoothness}{mask_tag}_cml.ptm'
     else:
-        save_path = f'/data1/xiangcen/models/registration/baseline_l{args.smoothness}.ptm'
+        save_path = f'/data1/xiangcen/models/registration/baseline_l{args.smoothness}{mask_tag}.ptm'
 
     print(f'>>> Smoothness lambda = {args.smoothness}')
     print(f'>>> Model will be saved to: {save_path}')
