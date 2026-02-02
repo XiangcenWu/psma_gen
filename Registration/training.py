@@ -4,7 +4,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from Registration.mask import sample_labels_to_binary
+from Registration.mask import sample_labels_to_binary, sample_shared_binary_masks
 from Registration.smoothness_losses import l2_gradient
 
 from monai.losses import DiceLoss
@@ -40,7 +40,7 @@ def make_identity_grid_m11(spatial_size, device=None, dtype=torch.float32):
 loss_function_dice = DiceLoss(
     to_onehot_y=False,
     softmax=False,
-    include_background=False
+    include_background=True
 )
 loss_function_mse = torch.nn.MSELoss()
 
@@ -51,6 +51,7 @@ def train_batch(
         identity_grid,
         smoothness_lambda=1000,
         cross_modality_loss=False,
+        num_masks=0,
         device="cuda:0"
     ):
     
@@ -95,6 +96,13 @@ def train_batch(
         grid = identity_grid + ddf
         grid = grid.permute(0, 2, 3, 4, 1)
 
+        if num_masks != 0:
+
+            fdg_masks, psma_masks = sample_shared_binary_masks(
+                moving_mask = fdg_mask,
+                fixed_mask=psma_mask,
+                num_samples=num_masks
+            )
         warped_moving_mask = torch.nn.functional.grid_sample(fdg_mask, grid)
 
         if cross_modality_loss:

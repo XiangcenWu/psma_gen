@@ -59,7 +59,8 @@ def main(args):
             optimizer,
             identity_grid,
             smoothness_lambda=args.smoothness,
-            cross_modality_loss=args.cross_modality_loss
+            cross_modality_loss=args.cross_modality_loss,
+            num_masks=args.num_masks
         )
 
         print(f'Epoch {epoch:03d} | Loss = {loss_batch:.6f}')
@@ -91,6 +92,14 @@ if __name__ == "__main__":
         default=200,
         help="Number of training epochs"
     )
+
+    parser.add_argument(
+        "--num_masks",
+        type=int,
+        default=0,
+        help="Number of sampled masks for weak supervision (0 = use all shared labels)"
+    )
+
 
     parser.add_argument(
         "--lr",
