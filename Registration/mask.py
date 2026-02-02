@@ -9,12 +9,12 @@ def sample_labels_to_binary(mask):
 
 
 def sample_shared_binary_masks(
-    moving_mask: torch.Tensor,
-    fixed_mask: torch.Tensor,
-    num_samples: int,
-    ignore_label: int = 0,
-    device='cuda:0'
-) -> Tuple[torch.Tensor, torch.Tensor]:
+        moving_mask: torch.Tensor,
+        fixed_mask: torch.Tensor,
+        num_samples: int,
+        ignore_label: int = 0,
+        device='cuda:0'
+    ):
     """
     Args:
         moving_mask: Tensor of shape (N, B, X, Y, Z) or (N, X, Y, Z)
