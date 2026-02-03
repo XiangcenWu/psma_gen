@@ -24,8 +24,8 @@ def tensor_to_itk(tensor, spacing=None):
     array = tensor.numpy().transpose(2, 1, 0)
     itk_img = sitk.GetImageFromArray(array)
 
-    if spacing is not None:
-        itk_img.SetSpacing(spacing)
+    # if spacing is not None:
+    #     itk_img.SetSpacing(spacing)
 
 
     return itk_img
