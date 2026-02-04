@@ -120,7 +120,7 @@ def main(args):
 
 
     test_loader = create_data_loader(
-        test_list, train_transform
+        test_list, train_transform, shuffle=False
     )
 
     identity_grid = make_identity_grid_m11(
