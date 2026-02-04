@@ -1,7 +1,7 @@
 import argparse
 # personal imports
 from ProcessZip import process_zip_files
-from Inference_TS import get_ct_bodymask, get_ct_totalmask
+from Inference_TS import get_ct_masks
 from Dicom2Nii import separate_dicom_modalities
 from cropAintensiry import crop_and_intensity
 import os
@@ -11,7 +11,9 @@ import os
 
 if __name__ == '__main__':
     parser = \
-        argparse.ArgumentParser(description="Process medical archives, run inference, and convert to H5.")
+        argparse.ArgumentParser(description="pressed_dir is the dir with all pressed files for example 9.8.zip  \n" + \
+            "patient_dir are all patiens names with all niifty files in it" + \
+                "h5_dir is final processed h5 file dir")
     parser.add_argument(
         "--pressed_dir",
         type=str,
@@ -30,6 +32,13 @@ if __name__ == '__main__':
         required=True,
         help="Path to the ts model dir."
     )
+    
+    parser.add_argument(
+        "--h5_dir",
+        type=str,
+        required=True,
+        help="Path to save h5 cropped files."
+    )
 
 
 
@@ -38,14 +47,19 @@ if __name__ == '__main__':
 
 
     os.environ["TOTALSEG_WEIGHTS_PATH"] = args.ts_dir
-
-    # process all zip/rar files and saved to one place
-    # process_zip_files(args.pressed_dir, args.patient_dir)
-    # inference using totalsegmentator
-    # get_ct_bodymask(args.patient_dir)
-    # crop and intensity range then convert to h5
-    # crop_and_intensity(args.patient_dir)
+    
+    
+    process_zip_files(args.pressed_dir, args.patient_dir)
 
 
     # get total mask
-    get_ct_totalmask(args.patient_dir)
+    get_ct_masks(args.patient_dir, task='total')
+    # get body mask
+    get_ct_masks(args.patient_dir, task='body')
+    # get appendicular_bones mask
+    get_ct_masks(args.patient_dir, task='appendicular_bones')
+    
+    
+    crop_and_intensity(patient_dir=args.patient_dir, 
+    save_dir=args.h5_dir,
+    img_size=(128, 128, 384))
