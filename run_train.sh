@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH --job-name=train_job       # 作业名称
+#SBATCH --partition=gpu            # 队列分区（根据你集群实际分区名修改，通常是 gpu）
+#SBATCH --nodelist=gpu02           # 指定在 gpu02 节点运行
+#SBATCH --nodes=1                  # 使用 1 个节点
+#SBATCH --ntasks=1                 # 运行 1 个任务
+#SBATCH --cpus-per-task=6          # 每个任务 6 个 CPU
+#SBATCH --mem=32G                  # 内存 32G
+#SBATCH --gres=gpu:1               # 使用 1 块 GPU
+#SBATCH --output=log_%j.out        # 标准输出日志 (%j 会自动替换为作业 ID)
+#SBATCH --error=log_%j.err         # 错误日志
+
+
+# source ~/anaconda3/etc/profile.d/conda.sh
+conda activate gen
+
+python Registration/train.py \
+    --smoothness 0.5 \
+    --epochs 100 \
+    --lr 0.001 \
+    --num_masks 5
