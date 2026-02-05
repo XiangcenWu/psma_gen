@@ -81,9 +81,7 @@ def train_batch(
 
         input = torch.cat([fdg_pt, psma_pt], dim=1)
 
-        # sample mask to be used to train loss
-        fdg_mask = sample_labels_to_binary(fdg_mask)
-        psma_mask = sample_labels_to_binary(psma_mask)
+
 
 
 
