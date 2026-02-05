@@ -7,8 +7,8 @@
 #SBATCH --cpus-per-task=6          # 每个任务 6 个 CPU
 #SBATCH --mem=32G                  # 内存 32G
 #SBATCH --gres=gpu:1               # 使用 1 块 GPU
-#SBATCH --output=log_%j.out        # 标准输出日志 (%j 会自动替换为作业 ID)
-#SBATCH --error=log_%j.err         # 错误日志
+#SBATCH --output=~/log_%j.out        # 标准输出日志 (%j 会自动替换为作业 ID)
+#SBATCH --error=~/log_%j.err         # 错误日志
 
 
 # source ~/anaconda3/etc/profile.d/conda.sh
