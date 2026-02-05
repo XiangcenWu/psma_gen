@@ -55,7 +55,7 @@ if __name__ == '__main__':
     # get total mask
     get_ct_masks(args.patient_dir, task='total')
     # get body mask
-    get_ct_masks(args.patient_dir, task='body')
+    # get_ct_masks(args.patient_dir, task='body')
     # get appendicular_bones mask
     get_ct_masks(args.patient_dir, task='appendicular_bones')
     
