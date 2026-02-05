@@ -15,7 +15,7 @@
 conda activate gen
 
 python Registration/train.py \
-    --smoothness 0.5 \
-    --epochs 100 \
-    --lr 0.001 \
-    --num_masks 5
+    --smoothness 100 \
+    --epochs 500 \
+    --lr 1e-5 \
+    --num_masks 50
