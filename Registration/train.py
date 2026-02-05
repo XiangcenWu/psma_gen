@@ -67,7 +67,8 @@ def main(args):
 
         print(f'Epoch {epoch:03d} | Loss = {loss_batch:.6f}')
 
-        torch.save(model.state_dict(), save_path)
+    torch.save(model.state_dict(), save_path)
+    print(f'model saved at {save_path}')
 
 
 if __name__ == "__main__":
