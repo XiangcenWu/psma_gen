@@ -106,10 +106,12 @@ def train_batch(
 
         if cross_modality_loss == 'mse':
             warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-            loss = loss_function_dice(psma_masks, warped_moving_masks) + loss_function_mse(warped_moving_ct, psma_ct) + smoothness_loss
+            loss = loss_function_dice(psma_masks, warped_moving_masks) + \
+                loss_function_mse(warped_moving_ct, psma_ct) + smoothness_loss
         elif cross_modality_loss == 'dice':
             warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-            loss = loss_function_dice(psma_masks, warped_moving_masks) + loss_function_dice(warped_moving_ct, psma_ct) + smoothness_loss
+            loss = loss_function_dice(psma_masks, warped_moving_masks) + \
+                loss_function_dice(warped_moving_ct, psma_ct) + smoothness_loss
         else:
             loss = loss_function_dice(psma_masks, warped_moving_masks) + smoothness_loss
 
