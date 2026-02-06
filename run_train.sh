@@ -4,11 +4,11 @@
 #SBATCH --nodelist=gpu02           # 指定在 gpu02 节点运行
 #SBATCH --nodes=1                  # 使用 1 个节点
 #SBATCH --ntasks=1                 # 运行 1 个任务
-#SBATCH --cpus-per-task=6          # 每个任务 6 个 CPU
+#SBATCH --cpus-per-task=8          # 每个任务 8 个 CPU
 #SBATCH --mem=32G                  # 内存 32G
 #SBATCH --gres=gpu:1               # 使用 1 块 GPU
-#SBATCH --output=log_%j.out        # 标准输出日志 (%j 会自动替换为作业 ID)
-#SBATCH --error=log_%j.err         # 错误日志
+#SBATCH --output=log_%A_%a.out        # 标准输出日志 (%j 会自动替换为作业 ID)
+#SBATCH --error=log_%A_%a.err         # 错误日志
 
 
 SMOOTH_LIST=(10 100 1000)
@@ -26,4 +26,5 @@ python Registration/train.py \
     --smoothness {} \
     --epochs 500 \
     --lr 1e-5 \
-    --num_masks 50
+    --num_masks 50 \
+    --cross_modality_loss dice

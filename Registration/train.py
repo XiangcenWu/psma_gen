@@ -65,7 +65,6 @@ def main(args):
             smoothness_lambda=args.smoothness,
             cross_modality_loss=args.cross_modality_loss,
             num_masks=args.num_masks,
-            cross_modality_loss=args.cross_modality_loss
         )
 
         print(f'Epoch {epoch:03d} | Loss = {loss_batch:.6f}')

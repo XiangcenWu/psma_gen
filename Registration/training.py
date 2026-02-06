@@ -50,9 +50,8 @@ def train_batch(
         optimizer,
         identity_grid,
         smoothness_lambda=1000,
-        cross_modality_loss=False,
-        num_masks=50,
         cross_modality_loss='mse',
+        num_masks=50,
         device="cuda:0"
     ):
     
