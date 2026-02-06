@@ -10,44 +10,31 @@ import numpy as np
 from tqdm import tqdm
 from General.segments import SEGMENT_INDEX
 
-def mutual_information(img_fixed, img_moving, num_bins=64):
+from monai.losses import GlobalMutualInformationLoss
+
+def mutual_information(fixed, moving, num_bins=64):
     """
-    Compute Mutual Information (MI) between two images using PyTorch.
+    Compute Mutual Information using MONAI.
+    Inputs: tensors of same shape, any dimension (2D/3D), no batch dim needed.
     """
-    # Ensure inputs are tensors and flattened
-    img_fixed = torch.as_tensor(img_fixed).flatten().float()
-    img_moving = torch.as_tensor(img_moving).flatten().float()
-    # 1. Calculate the min/max for binning
-    # Note: For medical imaging, you might want to use fixed ranges (e.g., 0-255)
-    f_min, f_max = img_fixed.min(), img_fixed.max()
-    m_min, m_max = img_moving.min(), img_moving.max()
-    # 2. Compute Joint Histogram
-    # We stack them to create a (N, 2) input for histogramdd
-    sample = torch.stack([img_fixed, img_moving], dim=1)
-    # Define the range for both dimensions
-    hist_range = [f_min, f_max, m_min, m_max]
-    joint_hist = torch.histogramdd(
-        sample, 
-        bins=num_bins, 
-        range=hist_range
-    ).hist
-    # 3. Convert to probability distribution
-    joint_prob = joint_hist / joint_hist.sum()
-    # 4. Marginal probabilities
-    prob_fixed = joint_prob.sum(dim=1)
-    prob_moving = joint_prob.sum(dim=0)
-    # 5. Mutual Information calculation
-    # We use a small epsilon to avoid log(0) and division by zero
-    eps = torch.finfo(joint_prob.dtype).eps
-    # Outer product of marginals: p(x) * p(y)
-    marginals_prod = torch.outer(prob_fixed, prob_moving)
-    # MI = sum( P(x,y) * log( P(x,y) / (P(x)*P(y)) ) )
-    # Only calculate where joint_prob > 0
-    mask = joint_prob > 0
-    mi = torch.sum(
-        joint_prob[mask] * torch.log(joint_prob[mask] / (marginals_prod[mask] + eps))
+    # Add batch and channel dims if missing
+    if fixed.ndim == 2:
+        fixed = fixed.unsqueeze(0).unsqueeze(0)   # (1, 1, H, W)
+        moving = moving.unsqueeze(0).unsqueeze(0)
+    elif fixed.ndim == 3:
+        fixed = fixed.unsqueeze(0).unsqueeze(0)   # (1, 1, H, W, D)
+        moving = moving.unsqueeze(0).unsqueeze(0)
+    elif fixed.ndim == 4:
+        # Assume (H, W, D, C) → permute? Better to ensure (B, C, H, W, D)
+        raise ValueError("Handle 4D as needed")
+
+    mi_loss = GlobalMutualInformationLoss(
+        num_bins=num_bins,
+        kernel_type="gaussian",
+        
     )
-    return mi
+    neg_mi = mi_loss(moving, fixed)
+    return -neg_mi
 
 def get_binary_mask_with_label(mask: torch.tensor, label: int) -> torch.tensor:
 
@@ -85,12 +72,12 @@ def inference_batch(
         model,
         loader,
         identity_grid,
-        maks_names, # list of names
+        masks_names, # list of names
         device="cuda:0"
     ):
 
     mask_list = []
-    for name in maks_names:
+    for name in masks_names:
         if name in SEGMENT_INDEX:
             mask_list.append(SEGMENT_INDEX[name])
         else:
@@ -107,9 +94,9 @@ def inference_batch(
     mi_after = []
 
 
-    num_of_masks = len(names)
-    dice_before_lists = [[] for _ in range(num_masks)]
-    dice_after_lists = [[] for _ in range(num_masks)]
+    num_of_masks = len(masks_names)
+    dice_before_lists = [[] for _ in range(num_of_masks)]
+    dice_after_lists = [[] for _ in range(num_of_masks)]
 
 
 

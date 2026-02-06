@@ -9,7 +9,7 @@
 #SBATCH --gres=gpu:1               # 使用 1 块 GPU
 #SBATCH --output=log_%A_%a.out        # 标准输出日志 (%j 会自动替换为作业 ID)
 #SBATCH --error=log_%A_%a.err         # 错误日志
-
+#SBATCH --array=0-2
 
 SMOOTH_LIST=(10 100 1000)
 
@@ -23,8 +23,9 @@ cd ~/projects/psma_gen
 echo "Running job with smoothness: $CURRENT_SMOOTH"
 
 python Registration/train.py \
-    --smoothness {} \
-    --epochs 500 \
+    --smoothness $CURRENT_SMOOTH \
+    --epochs 250 \
     --lr 1e-5 \
-    --num_masks 50 \
-    --cross_modality_loss dice
+    --num_masks 10 \
+    --cross_modality_loss mse
+
