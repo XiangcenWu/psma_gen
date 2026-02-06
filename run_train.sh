@@ -11,7 +11,7 @@
 #SBATCH --error=log_%A_%a.err         # 错误日志
 #SBATCH --array=0-2
 
-SMOOTH_LIST=(10 100 1000)
+SMOOTH_LIST=(200 400 800)
 
 
 CURRENT_SMOOTH=${SMOOTH_LIST[$SLURM_ARRAY_TASK_ID]}
@@ -27,5 +27,5 @@ python Registration/train.py \
     --epochs 250 \
     --lr 1e-5 \
     --num_masks 10 \
-    --cross_modality_loss mse
+    --cross_modality_loss dice
 

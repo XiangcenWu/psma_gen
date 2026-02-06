@@ -51,7 +51,6 @@ def main(args):
         model,
         test_loader,
         identity_grid,
-        ['liver'],
         device=args.device
     )
 

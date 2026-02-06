@@ -1,0 +1,14 @@
+Running job with smoothness: 200
+Total: 162 | Train: 142 | Val: 20
+>>> Smoothness lambda = 200.0
+>>> Model will be saved to: /data1/xiangcen/models/registration/baseline_l200_k10_cmldice.ptm
+Epoch 000 | Loss = 6.094897
+Epoch 001 | Loss = 3.602707
+Epoch 002 | Loss = 2.765005
+Epoch 003 | Loss = 2.374748
+Epoch 004 | Loss = 2.166170
+Epoch 005 | Loss = 2.029513
+Epoch 006 | Loss = 1.927008
+Epoch 007 | Loss = 1.841464
+Epoch 008 | Loss = 1.775918
+Epoch 009 | Loss = 1.719710

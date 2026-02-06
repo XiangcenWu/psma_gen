@@ -12,6 +12,18 @@ from General.segments import SEGMENT_INDEX
 
 from monai.losses import GlobalMutualInformationLoss
 
+
+def dice_metric(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """
+    pred, target: same shape, binary (0/1) tensors
+    """
+    pred = pred.reshape(-1)
+    target = target.reshape(-1)
+
+    intersection = (pred * target).sum()
+    return (2.0 * intersection + eps) / (pred.sum() + target.sum() + eps)
+
+
 def mutual_information(fixed, moving, num_bins=64):
     """
     Compute Mutual Information using MONAI.
@@ -60,19 +72,21 @@ def summarize_statistics(list1, list2, percentile=95):
     for name, lst in zip(["before", "after"], [list1, list2]):
         arr = np.array(lst)
         stats[name] = {
-            "mean": np.mean(arr),
-            "std": np.std(arr, ddof=1),  # use ddof=1 for sample std
-            f"{percentile}th_percentile": np.percentile(arr, percentile)
+            "mean": np.mean(arr).item(),
+            "std": np.std(arr, ddof=1).item(),  # use ddof=1 for sample std
+            f"{percentile}th_percentile": np.percentile(arr, percentile).item()
         }
 
     return stats
+
+
 
 @torch.no_grad()
 def inference_batch(
         model,
         loader,
         identity_grid,
-        masks_names, # list of names
+        masks_names=list(SEGMENT_INDEX.keys()), # list of names
         device="cuda:0"
     ):
 
@@ -118,9 +132,6 @@ def inference_batch(
 
         input = torch.cat([fdg_pt, psma_pt], dim=1)
 
-        # sample mask to be used to train loss
-        # fdg_mask = sample_labels_to_binary(fdg_mask)
-        # psma_mask = sample_labels_to_binary(psma_mask)
 
 
 
@@ -134,10 +145,25 @@ def inference_batch(
         # -----------------------------
         warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
 
-        mi_after.append(mutual_information(warped_fdg_pt, psma_pt).item())
+        mi_after.append(mutual_information(warped_fdg_pt, psma_pt).cpu().item())
+        
+        for idx, names in enumerate(masks_names):
+            mask_idx = mask_list[idx]
+            binary_mask_fdg = get_binary_mask_with_label(fdg_mask, mask_idx)
+            binary_mask_psma = get_binary_mask_with_label(psma_mask, mask_idx)
 
-        stats = summarize_statistics(mi_before, mi_after)
-        print('This is stats for MI')
+            dice_before_lists[idx].append(dice_metric(binary_mask_fdg, binary_mask_psma).cpu().item())
+            warpped_fdg_mask = torch.nn.functional.grid_sample(binary_mask_fdg, grid)
+            dice_after_lists[idx].append(dice_metric(warpped_fdg_mask, binary_mask_psma).cpu().item())
+
+
+    stats = summarize_statistics(mi_before, mi_after)
+    print('This is stats for MI')
+    print(stats)
+
+    for idx, names in enumerate(masks_names):
+        print(names)
+        stats = summarize_statistics(dice_before_lists[idx], dice_after_lists[idx])
         print(stats)
 
 
