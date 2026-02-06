@@ -43,7 +43,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description="Generate deformation fields using SwinUNETR"
+        description="print results"
     )
 
     parser.add_argument(
