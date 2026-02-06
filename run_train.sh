@@ -7,15 +7,23 @@
 #SBATCH --cpus-per-task=6          # 每个任务 6 个 CPU
 #SBATCH --mem=32G                  # 内存 32G
 #SBATCH --gres=gpu:1               # 使用 1 块 GPU
-#SBATCH --output=~/log_%j.out        # 标准输出日志 (%j 会自动替换为作业 ID)
-#SBATCH --error=~/log_%j.err         # 错误日志
+#SBATCH --output=log_%j.out        # 标准输出日志 (%j 会自动替换为作业 ID)
+#SBATCH --error=log_%j.err         # 错误日志
 
 
-# source ~/anaconda3/etc/profile.d/conda.sh
+SMOOTH_LIST=(10 100 1000)
+
+
+CURRENT_SMOOTH=${SMOOTH_LIST[$SLURM_ARRAY_TASK_ID]}
+
+source ~/miniconda3/etc/profile.d/conda.sh
 conda activate gen
+cd ~/projects/psma_gen
+
+echo "Running job with smoothness: $CURRENT_SMOOTH"
 
 python Registration/train.py \
-    --smoothness 100 \
+    --smoothness {} \
     --epochs 500 \
     --lr 1e-5 \
     --num_masks 50

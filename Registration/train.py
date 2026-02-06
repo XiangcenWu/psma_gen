@@ -46,8 +46,10 @@ def main(args):
 
     mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
 
-    if args.cross_modality_loss:
-        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}_cml.ptm'
+    if args.cross_modality_loss == 'dice':
+        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}_cmldice.ptm'
+    elif args.cross_modality_loss == 'mse':
+        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}_cmlmse.ptm'
     else:
         save_path = f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
 
@@ -62,7 +64,8 @@ def main(args):
             identity_grid,
             smoothness_lambda=args.smoothness,
             cross_modality_loss=args.cross_modality_loss,
-            num_masks=args.num_masks
+            num_masks=args.num_masks,
+            cross_modality_loss=args.cross_modality_loss
         )
 
         print(f'Epoch {epoch:03d} | Loss = {loss_batch:.6f}')
@@ -84,8 +87,10 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--cross_modality_loss",
-        action="store_true",
-        help="Enable cross-modality loss"
+        type=str,
+        choices=["dice", "mse"],
+        default=None,
+        help="Cross-modality loss type: 'dice' or 'mse'"
     )
 
 
