@@ -1,0 +1,67 @@
+from inferencing import inference_batch
+
+
+def main(args):
+    device = args.device
+
+    model = SwinUNETR(
+        in_channels=2,
+        out_channels=3,
+        depths=(2, 2, 2, 2),
+        num_heads=(3, 6, 12, 24),
+        downsample="mergingv2",
+        use_v2=True,
+    )
+
+    model.load_state_dict(torch.load(args.weights_path, map_location=device))
+
+    train_transform = ReadH5d()
+
+    train_list, test_list = split_train_test(
+        '/data1/xiangcen/data/pet_gen/processed/batch1_h5'
+    )
+
+
+    test_loader = create_data_loader(
+        test_list, train_transform, shuffle=False
+    )
+
+    identity_grid = make_identity_grid_m11(
+        (128, 128, 384), device=device
+    )
+
+
+    inference_batch(
+        model,
+        test_loader,
+        identity_grid,
+        ['liver'],
+        device=args.device
+    )
+
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Generate deformation fields using SwinUNETR"
+    )
+
+    parser.add_argument(
+        "--weights_path",
+        type=str,
+        required=True,
+        help="Path to the trained SwinUNETR model weights (.pth)"
+    )
+
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda:0" if torch.cuda.is_available() else "cpu",
+        help="Device to run on (e.g., cuda, cuda:0, cpu)"
+    )
+
+
+
+    args = parser.parse_args()
+
+    main(args)
