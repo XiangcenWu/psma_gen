@@ -42,7 +42,7 @@ loss_function_dice = DiceLoss(
     softmax=False,
     include_background=True
 )
-loss_function_mse = torch.nn.MSELoss()
+
 
 def train_batch(
         model, 
@@ -52,7 +52,6 @@ def train_batch(
         smoothness_lambda=1000,
         ct_smoothness = False,
         ct_smoothness_margin = 3000,
-        cross_modality_loss='mse',
         num_masks=50,
         device="cuda:0"
     ):
@@ -66,10 +65,9 @@ def train_batch(
 
 
     for batch in loader:
-        # Option A: Manual unpacking to specific variable names
-        if cross_modality_loss or ct_smoothness:
-            fdg_ct = batch['fdg_ct'].to(device)
-            psma_ct = batch['psma_ct'].to(device)
+
+        fdg_ct = batch['fdg_ct'].to(device)
+        psma_ct = batch['psma_ct'].to(device)
 
 
         fdg_pt = batch['fdg_pt'].to(device)
@@ -107,20 +105,11 @@ def train_batch(
             )
         warped_moving_masks = torch.nn.functional.grid_sample(fdg_masks, grid)
 
-        if cross_modality_loss == 'mse':
-            warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-            loss = loss_function_dice(psma_masks, warped_moving_masks) + \
-                loss_function_mse(warped_moving_ct, psma_ct) + smoothness_loss
-        elif cross_modality_loss == 'dice':
-            warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-            loss = loss_function_dice(psma_masks, warped_moving_masks) + \
-                loss_function_dice(warped_moving_ct, psma_ct) + smoothness_loss
-        elif cross_modality_loss == None and ct_smoothness:
-            warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-            loss = loss_function_dice(psma_masks, warped_moving_masks) + \
-                loss_function_dice(warped_moving_ct, psma_ct) + smoothness_loss
-        else:
-            loss = loss_function_dice(psma_masks, warped_moving_masks) + smoothness_loss
+
+        warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
+        loss = loss_function_dice(psma_masks, warped_moving_masks) + \
+            loss_function_dice(warped_moving_ct, psma_ct) + smoothness_loss
+
 
         loss.backward()
         optimizer.step()
@@ -135,28 +124,24 @@ def train_batch(
 
 
 def get_save_path(args) -> str:
-    mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
+    mask_tag = "" if args.num_masks == 0 else f"k{args.num_masks}"
 
-    if args.cross_modality_loss == 'dice':
-        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}_cmldice.ptm'
-        if args.ct_smoothness:
-            save_path=\
-                f'/data1/xiangcen/models/registration/\
-                    ctsmoothness_l{int(args.smoothness)}{mask_tag}_cmldice_{args.smoothness_margin}.ptm'
-
-    elif args.cross_modality_loss == 'mse':
-        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}_cmlmse.ptm'
-        if args.ct_smoothness:
-            save_path=\
-                f'/data1/xiangcen/models/registration/\
-                    ctsmoothness_l{int(args.smoothness)}{mask_tag}_cmlmse_{args.smoothness_margin}.ptm'
-
+    save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
+    if args.ct_smoothness:
+        save_path=\
+            f'/data1/xiangcen/models/registration/\
+                ctsmoothness_l{int(args.smoothness)}_{mask_tag}_mar{int(args.smoothness_margin)}.ptm'
     else:
-        save_path = f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
+        save_path=\
+            f'/data1/xiangcen/models/registration/\
+                baseline_l{int(args.smoothness)}_{mask_tag}.ptm'
+
+
     return save_path
 
 
 def get_ct_lambda(ct_img, margin, smoothness):
+    ct_img = ct_img[:, :, 1:-1, 1:-1, 1:-1] # slice to match the gradient tensor
     _min, _max = smoothness-margin, smoothness+margin
     return _min + ct_img * (_max - _min)
 

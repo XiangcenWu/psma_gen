@@ -59,7 +59,6 @@ def main(args):
             smoothness_lambda=args.smoothness,
             ct_smoothness = args.ct_smoothness,
             ct_smoothness_margin = args.ct_smoothness_margin,
-            cross_modality_loss=args.cross_modality_loss,
             num_masks=args.num_masks,
         )
 
@@ -75,39 +74,28 @@ if __name__ == "__main__":
     parser.add_argument(
         "--smoothness",
         type=float,
-        default=10.0,
+        default=8000,
         help="Smoothness regularization weight (lambda)"
     )
-
-
-    parser.add_argument(
-        "--cross_modality_loss",
-        type=str,
-        choices=["dice", "mse"],
-        default=None,
-        help="Cross-modality loss type: 'dice' or 'mse'"
-    )
-
 
     parser.add_argument(
         "--epochs",
         type=int,
-        default=200,
+        default=350,
         help="Number of training epochs"
     )
 
     parser.add_argument(
         "--num_masks",
         type=int,
-        default=0,
+        default=5,
         help="Number of sampled masks for weak supervision (0 = use all shared labels)"
     )
-
 
     parser.add_argument(
         "--lr",
         type=float,
-        default=1e-4,
+        default=1e-5,
         help="Learning rate"
     )
 
@@ -117,7 +105,6 @@ if __name__ == "__main__":
         default="cuda:0",
         help="Training device"
     )
-    
     
     parser.add_argument(
         "--ct_smoothness",
