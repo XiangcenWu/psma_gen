@@ -11,7 +11,7 @@
 #SBATCH --error=log_%A_%a.err         # 错误日志
 #SBATCH --array=0-2
 
-SMOOTH_LIST=(200 400 800)
+SMOOTH_LIST=(5000 8000 12000)
 
 
 CURRENT_SMOOTH=${SMOOTH_LIST[$SLURM_ARRAY_TASK_ID]}
@@ -24,8 +24,8 @@ echo "Running job with smoothness: $CURRENT_SMOOTH"
 
 python Registration/train.py \
     --smoothness $CURRENT_SMOOTH \
-    --epochs 250 \
+    --epochs 350 \
     --lr 1e-5 \
     --num_masks 10 \
-    --cross_modality_loss dice
-
+    --ct_smoothness \
+    --ct_smoothness_margin 3000
