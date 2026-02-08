@@ -7,10 +7,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from monai.networks.nets import SwinUNETR
 from General.data_loader import create_data_loader, ReadH5d
-import torch.nn as nn
+
 
 from General.dataset_sample import split_train_test
-from Registration.training import train_batch, make_identity_grid_m11
+from Registration.training import train_batch, make_identity_grid_m11, get_save_path
 
 
 def main(args):
@@ -44,14 +44,8 @@ def main(args):
         (128, 128, 384), device=device
     )
 
-    mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
+    save_path = get_save_path(args)
 
-    if args.cross_modality_loss == 'dice':
-        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}_cmldice.ptm'
-    elif args.cross_modality_loss == 'mse':
-        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}_cmlmse.ptm'
-    else:
-        save_path = f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
 
     print(f'>>> Smoothness lambda = {args.smoothness}')
     print(f'>>> Model will be saved to: {save_path}')
@@ -63,6 +57,8 @@ def main(args):
             optimizer,
             identity_grid,
             smoothness_lambda=args.smoothness,
+            ct_smoothness = args.ct_smoothness,
+            ct_smoothness_margin = args.ct_smoothness_margin,
             cross_modality_loss=args.cross_modality_loss,
             num_masks=args.num_masks,
         )
@@ -120,6 +116,20 @@ if __name__ == "__main__":
         type=str,
         default="cuda:0",
         help="Training device"
+    )
+    
+    
+    parser.add_argument(
+        "--ct_smoothness",
+        action="store_true",
+        help="Enable CT as ddf smoothness regularization (default: False)"
+    )
+
+    parser.add_argument(
+        "--ct_smoothness_margin",
+        type=float,
+        default=3000.0,
+        help="Margin value for CT smoothness regularization (default: 3000)"
     )
 
     args = parser.parse_args()
