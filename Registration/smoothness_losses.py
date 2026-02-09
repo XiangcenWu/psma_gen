@@ -18,8 +18,11 @@ def gradient_dy(arr):
 def gradient_dz(arr):
     return (arr[:, 1:-1, 1:-1, 2:] - arr[:, 1:-1, 1:-1, :-2]) / 2
 
-def l2_gradient(ddf):
+def l2_gradient(ddf, tensor_weights=None):
     dTdx = gradient_txyz(ddf, gradient_dx)
     dTdy = gradient_txyz(ddf, gradient_dy)
     dTdz = gradient_txyz(ddf, gradient_dz)
-    return torch.mean(dTdx**2 + dTdy** 2 + dTdz**2)
+    L2 = dTdx**2 + dTdy** 2 + dTdz**2
+    if tensor_weights:
+        return torch.mean(tensor_weights * L2)
+    return torch.mean(L2)

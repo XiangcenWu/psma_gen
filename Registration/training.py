@@ -90,7 +90,8 @@ def train_batch(
 
         #claculate smoothness loss first hand 
         if ct_smoothness:
-            smoothness_loss = get_ct_lambda(fdg_ct, ct_smoothness_margin, smoothness_lambda)*l2_gradient(ddf)
+            tensor_weights = get_ct_lambda(fdg_ct, ct_smoothness_margin, smoothness_lambda)
+            smoothness_loss = l2_gradient(ddf, tensor_weights)
         else:
             smoothness_loss = smoothness_lambda*l2_gradient(ddf)
 
