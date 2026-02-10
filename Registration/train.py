@@ -33,7 +33,7 @@ def main(args):
     )
 
     train_loader = create_data_loader(
-        train_list, train_transform, batch_size=1
+        train_list, train_transform, batch_size=2
     )
     print(test_list[:3]) 
 
