@@ -55,18 +55,18 @@ def generate_warp(
 
         fdg_pt = batch['fdg_pt'].to(device)
         fdg_mask = batch['fdg_mask'].to(device)
+        fdg_ct = batch['fdg_ct'].to(device)
         fdg_spacing = batch['fdg_spacing']
 
         psma_pt = batch['psma_pt'].to(device)
         psma_mask = batch['psma_mask'].to(device)
+        psma_ct = batch['psma_ct'].to(device)
         psma_spacing = batch['psma_spacing']
         
 
         input = torch.cat([fdg_pt, psma_pt], dim=1)
 
-        # sample mask to be used to train loss
-        fdg_mask = sample_labels_to_binary(fdg_mask)
-        psma_mask = sample_labels_to_binary(psma_mask)
+
 
 
 
@@ -79,7 +79,9 @@ def generate_warp(
         # warp moving images
         # -----------------------------
         warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
-        warped_fdg_mask = torch.nn.functional.grid_sample(fdg_mask, grid)
+        warped_fdg_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
+        # mode is set to nearest so that it handles multi-label
+        warped_fdg_mask = torch.nn.functional.grid_sample(fdg_mask, grid, mode='nearest')
 
 
         sample_dir = os.path.join(result_dir, f"sample_{i:04d}")
@@ -88,14 +90,20 @@ def generate_warp(
 
         psma_pt_itk = tensor_to_itk(psma_pt, [t.item() for t in psma_spacing])
         psma_mask_itk = tensor_to_itk(psma_mask, [t.item() for t in psma_spacing])
+        psma_ct_itk = tensor_to_itk(psma_ct, [t.item() for t in psma_spacing])
+
         fdg_pt_warped_itk = tensor_to_itk(warped_fdg_pt, [t.item() for t in fdg_spacing])
         fdg_mask_warped_itk = tensor_to_itk(warped_fdg_mask, [t.item() for t in fdg_spacing])
+        fdg_ct_warped_itk = tensor_to_itk(warped_fdg_ct, [t.item() for t in fdg_spacing])
 
 
         sitk.WriteImage(psma_pt_itk, os.path.join(sample_dir, "psma_pt.nii.gz"))
         sitk.WriteImage(psma_mask_itk, os.path.join(sample_dir, "psma_ct_mask.nii.gz"))
+        sitk.WriteImage(psma_ct_itk, os.path.join(sample_dir, "psma_ct.nii.gz"))
+
         sitk.WriteImage(fdg_pt_warped_itk, os.path.join(sample_dir, "fdg_pt_warped.nii.gz"))
         sitk.WriteImage(fdg_mask_warped_itk, os.path.join(sample_dir, "fdg_mask_warped.nii.gz"))
+        sitk.WriteImage(fdg_ct_warped_itk, os.path.join(sample_dir, "fdg_ct_warped.nii.gz"))
 
 
 def main(args):
