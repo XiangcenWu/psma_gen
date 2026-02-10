@@ -33,11 +33,9 @@ def main(args):
     )
 
     train_loader = create_data_loader(
-        train_list, train_transform, batch_size=2
+        train_list, train_transform, batch_size=1
     )
-    test_loader = create_data_loader(
-        test_list, train_transform
-    )
+    print(test_list[:3]) 
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 

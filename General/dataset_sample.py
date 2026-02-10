@@ -32,8 +32,8 @@ def split_multiple_train_test(dirs, num_validations, seed=325):
 
         train, val = split_train_test(_dir, num_val, seed)
 
-        all_train.append(train)
-        all_val.append(val)
+        all_train += train
+        all_val += val
 
 
 
