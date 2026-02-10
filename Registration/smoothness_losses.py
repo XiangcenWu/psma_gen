@@ -23,6 +23,6 @@ def l2_gradient(ddf, tensor_weights=None):
     dTdy = gradient_txyz(ddf, gradient_dy)
     dTdz = gradient_txyz(ddf, gradient_dz)
     L2 = dTdx**2 + dTdy** 2 + dTdz**2
-    if tensor_weights:
+    if tensor_weights is not None:
         return torch.mean(tensor_weights * L2)
     return torch.mean(L2)

@@ -129,13 +129,9 @@ def get_save_path(args) -> str:
 
     save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
     if args.ct_smoothness:
-        save_path=\
-            f'/data1/xiangcen/models/registration/\
-                ctsmoothness_l{int(args.smoothness)}_{mask_tag}_mar{int(args.ct_smoothness_margin)}.ptm'
+        save_path=f'/data1/xiangcen/models/registration/ctsmoothness_l{int(args.smoothness)}_{mask_tag}_mar{int(args.ct_smoothness_margin)}.ptm'
     else:
-        save_path=\
-            f'/data1/xiangcen/models/registration/\
-                baseline_l{int(args.smoothness)}_{mask_tag}.ptm'
+        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}_{mask_tag}.ptm'
 
 
     return save_path
