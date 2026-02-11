@@ -27,5 +27,5 @@ python Registration/train.py \
     --epochs 350 \
     --lr 1e-5 \
     --num_masks 10 \
-    --ct_smoothness \
-    --ct_smoothness_margin 3000
+#    --ct_smoothness \
+#    --ct_smoothness_margin 3000
