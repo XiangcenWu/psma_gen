@@ -81,6 +81,38 @@ def summarize_statistics(list1, list2, percentile=95):
 
 
 
+def dice_for_organs(moving: torch.Tensor, fixed: torch.Tensor, organ_names: list, eps: float = 1e-6) -> list:
+    """
+    Calculate Dice scores for a list of organs using dice_metric.
+
+    Parameters:
+        moving: tensor of moving segmentation (H,W,D) or (B,H,W,D)
+        fixed: tensor of fixed segmentation (same shape as moving)
+        organ_names: list of strings, organ names in SEGMENT_INDEX
+        eps: small value to avoid division by zero
+
+    Returns:
+        List of Dice scores (float) in the same order as organ_names
+    """
+    dice_scores = []
+    
+    for organ_name in organ_names:
+        if organ_name not in SEGMENT_INDEX:
+            raise ValueError(f"Organ '{organ_name}' not in SEGMENT_INDEX")
+        
+        organ_label = SEGMENT_INDEX[organ_name]
+
+        # Create binary masks for the organ
+        moving_mask = (moving == organ_label).float()
+        fixed_mask = (fixed == organ_label).float()
+
+        # Compute Dice using dice_metric
+        dice_score = dice_metric(moving_mask, fixed_mask, eps)
+        dice_scores.append(dice_score.item())
+    
+    return dice_scores
+
+
 @torch.no_grad()
 def inference_batch(
         model,

@@ -10,7 +10,7 @@ from monai.networks.nets import SwinUNETR
 from General.data_loader import create_data_loader, ReadH5d
 import torch.nn as nn
 
-from General.dataset_sample import split_train_test
+from General.dataset_sample import split_multiple_train_test
 from Registration.training import make_identity_grid_m11
 
 from inferencing import inference_batch
@@ -33,8 +33,9 @@ def main(args):
 
     train_transform = ReadH5d()
 
-    train_list, test_list = split_train_test(
-        '/data1/xiangcen/data/pet_gen/processed/batch1_h5'
+    train_list, test_list = split_multiple_train_test(
+        ['/data1/xiangcen/data/pet_gen/processed/batch1_h5','/data1/xiangcen/data/pet_gen/processed/batch2_h5'],
+        [20, 30]
     )
 
 
