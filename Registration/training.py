@@ -52,6 +52,7 @@ def train_batch(
         smoothness_lambda=1000,
         ct_smoothness = False,
         ct_smoothness_margin = 3000,
+        ct_smoothness_gamma = 1,
         num_masks=50,
         device="cuda:0"
     ):
@@ -90,7 +91,7 @@ def train_batch(
 
         #claculate smoothness loss first hand 
         if ct_smoothness:
-            tensor_weights = get_ct_lambda(fdg_ct, ct_smoothness_margin, smoothness_lambda)
+            tensor_weights = get_ct_lambda(fdg_ct, ct_smoothness_margin, smoothness_lambda, ct_smoothness_gamma)
             smoothness_loss = l2_gradient(ddf, tensor_weights)
         else:
             smoothness_loss = smoothness_lambda*l2_gradient(ddf)
@@ -127,18 +128,21 @@ def train_batch(
 def get_save_path(args) -> str:
     mask_tag = "" if args.num_masks == 0 else f"k{args.num_masks}"
 
-    save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
+    save_path=f'/data1/xiangcen/models/registration_v2/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
     if args.ct_smoothness:
-        save_path=f'/data1/xiangcen/models/registration/ctsmoothness_l{int(args.smoothness)}_{mask_tag}_mar{int(args.ct_smoothness_margin)}.ptm'
+        save_path=f'/data1/xiangcen/models/registration_v2/ctsmoothness_l{int(args.smoothness)}_{mask_tag}_mar{int(args.ct_smoothness_margin)}.ptm'
     else:
-        save_path=f'/data1/xiangcen/models/registration/baseline_l{int(args.smoothness)}_{mask_tag}.ptm'
+        save_path=f'/data1/xiangcen/models/registration_v2/baseline_l{int(args.smoothness)}_{mask_tag}.ptm'
 
 
     return save_path
 
 
-def get_ct_lambda(ct_img, margin, smoothness):
+def get_ct_lambda(ct_img, margin, smoothness, gamma):
+
+
     ct_img = ct_img[:, :, 1:-1, 1:-1, 1:-1] # slice to match the gradient tensor
+    ct_img = ct_img ** gamma
     _min, _max = smoothness-margin, smoothness+margin
     return _min + ct_img * (_max - _min)
 

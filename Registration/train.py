@@ -29,7 +29,7 @@ def main(args):
 
     train_list, test_list = split_multiple_train_test(
         ['/data1/xiangcen/data/pet_gen/processed/batch1_h5','/data1/xiangcen/data/pet_gen/processed/batch2_h5'],
-        [20, 30]
+        [35, 35]
     )
 
     train_loader = create_data_loader(
@@ -58,6 +58,7 @@ def main(args):
             smoothness_lambda=args.smoothness,
             ct_smoothness = args.ct_smoothness,
             ct_smoothness_margin = args.ct_smoothness_margin,
+            ct_smoothness_gamma = args.ct_smoothness_gamma,
             num_masks=args.num_masks,
         )
 
@@ -117,6 +118,13 @@ if __name__ == "__main__":
         default=3000.0,
         help="Margin value for CT smoothness regularization (default: 3000)"
     )
+    parser.add_argument(
+        "--ct_smoothness_gamma",
+        type=float,
+        default=1.0,
+        help="gamma value for CT smoothness regularization (default: 3000)"
+    )
+
 
     args = parser.parse_args()
     main(args)
