@@ -4,6 +4,7 @@ from monai.transforms import ScaleIntensityRangePercentiles, Resize
 import os
 import h5py
 from tqdm import tqdm
+import numpy as np
 
 def bbox_range(arr, seg, ):
     assert arr.shape == seg.shape, "the shapes of img and seg are not equal"
@@ -129,7 +130,11 @@ def compute_new_voxel_dimension(
 
 
 def crop_and_intensity(patient_dir,
-                    save_dir, img_size=(128, 128, 384)):
+                    save_dir, img_size=(128, 128, 384), 
+                    lower=1,
+                    upper=99,
+                    b_min=0,
+                    b_max=1,):
 
 
     patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
@@ -216,7 +221,7 @@ def crop_and_intensity(patient_dir,
 
 
 
-        scaler = ScaleIntensityRangePercentiles(5, 95, 0, 1, clip=True)
+        scaler = ScaleIntensityRangePercentiles(lower, upper, b_min, b_max, clip=True)
         resizer = Resize(img_size, mode="trilinear")
         resizer_mask = Resize(img_size, mode="nearest-exact")
 
@@ -249,8 +254,199 @@ def crop_and_intensity(patient_dir,
 
 
 
+
+
+def save_nii(save_dir, fdg_ct, fdg_pt, fdg_mask, psma_ct, psma_pt, psma_mask, fdg_spacing, psma_spacing):
+    """
+    Save multiple medical imaging tensors as individual NIfTI files using SimpleITK.
+
+    Args:
+    save_dir: Directory to save the files
+    patient_name: Name of the patient (used as prefix for files)
+    fdg_ct: FDG CT tensor of shape (1, x, y, z)
+    fdg_pt: FDG PT tensor of shape (1, x, y, z)
+    fdg_mask: FDG mask tensor of shape (1, x, y, z)
+    psma_ct: PSMA CT tensor of shape (1, x, y, z)
+    psma_pt: PSMA PT tensor of shape (1, x, y, z)
+    psma_mask: PSMA mask tensor of shape (1, x, y, z)
+    fdg_spacing: Voxel spacing for FDG images (e.g., [z_spacing, y_spacing, x_spacing])
+    psma_spacing: Voxel spacing for PSMA images
+    """
+    # Create save directory if it doesn't exist
+    os.makedirs(save_dir, exist_ok=True)
+
+    def tensor_to_sitk_image(tensor, spacing):
+        """Convert tensor to SimpleITK image with proper spacing."""
+        # Convert to numpy if it's a torch tensor
+        
+        tensor.cpu().numpy()
+    
+        
+        tensor = np.array(tensor)
+
+        # Remove batch dimension (1, x, y, z) -> (x, y, z)
+        if tensor.shape[0] == 1:
+            tensor = tensor[0]
+
+        # SimpleITK expects (z, y, x) ordering, so transpose if needed
+        # Assuming input is (x, y, z), transpose to (z, y, x)
+        tensor = tensor.transpose(2, 1, 0)
+
+        # Create SimpleITK image
+        img = sitk.GetImageFromArray(tensor)
+
+        # Set spacing (SimpleITK uses [x, y, z] order)
+        img.SetSpacing([spacing[2], spacing[1], spacing[0]])
+
+        return img
+
+    # Define images to save with their names and spacings
+    images_to_save = [
+    (fdg_ct, "fdg_ct", fdg_spacing),
+    (fdg_pt, "fdg_pt", fdg_spacing),
+    (fdg_mask, "fdg_mask", fdg_spacing),
+    (psma_ct, "psma_ct", psma_spacing),
+    (psma_pt, "psma_pt", psma_spacing),
+    (psma_mask, "psma_mask", psma_spacing),
+    ]
+
+    # Save all images
+    for tensor, name, spacing in images_to_save:
+        img = tensor_to_sitk_image(tensor, spacing)
+        filepath = os.path.join(save_dir, f"{name}.nii.gz")
+        sitk.WriteImage(img, filepath)
+
+
+def crop_and_intensity_debug(patient_dir,
+                    save_dir, img_size=(128, 128, 384), 
+                    lower=1,
+                    upper=99,
+                    b_min=0,
+                    b_max=1,):
+
+
+    patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
+
+    
+    for idx, dir in enumerate(tqdm(patient_dir, desc="cropping and intensity range", unit="case")):
+
+        patient_name = f"patient_{idx:04d}.h5"
+        
+        # load all ct and pt images
+        fdg_ct = read_nii(os.path.join(dir, 'fdgCT_series2.nii.gz'))
+        psma_ct = read_nii(os.path.join(dir, 'psmaCT_series2.nii.gz'))  
+
+        fdg_pt = read_nii(os.path.join(dir, 'fdgPT_series1.nii.gz'))   
+        psma_pt = read_nii(os.path.join(dir, 'psmaPT_series1.nii.gz'))
+
+
+
+        # get the voxel dimension of psma_ct and fdg_ct
+        psma_ct_spacing = get_nii_spacing(psma_ct)
+        fdg_ct_spacing = get_nii_spacing(fdg_ct)
+
+
+        # get the maks for both fdg and psma
+        fdg_total_mask = read_nii(os.path.join(dir, 'fdgCT_total_mask.nii.gz'))
+        psma_total_mask = read_nii(os.path.join(dir, 'psmaCT_total_mask.nii.gz'))
+        fdg_app_mask = read_nii(os.path.join(dir, 'fdgCT_appendicular_bones_mask.nii.gz'))
+        psma_app_mask = read_nii(os.path.join(dir, 'psmaCT_appendicular_bones_mask.nii.gz'))
+        fdg_mask = fusion_ts_mask(read_nii_tensor(fdg_total_mask), read_nii_tensor(fdg_app_mask))
+        psma_mask = fusion_ts_mask(read_nii_tensor(psma_total_mask), read_nii_tensor(psma_app_mask))
+        
+        # resample PTs to CTs
+        fdg_pt = sitk.Resample(fdg_pt, fdg_ct, sitk.Transform(), sitk.sitkLinear)
+        psma_pt = sitk.Resample(psma_pt, psma_ct, sitk.Transform(), sitk.sitkLinear)
+        # get the voxel dimension of fdg and psma 
+        # fdg_ct, fdt_pt / psma_ct, psma_pt
+        # spacing should be the same as it has been resampled
+        psma_pt_spacing = get_nii_spacing(psma_pt)
+        fdg_pt_spacing = get_nii_spacing(fdg_pt)
+        # print to check
+        print(psma_pt_spacing, psma_ct_spacing, fdg_pt_spacing, fdg_ct_spacing)
+
+       
+
+        # load as pytorch tensor
+        fdg_ct = read_nii_tensor(fdg_ct)
+        psma_ct = read_nii_tensor(psma_ct)  
+        fdg_pt = read_nii_tensor(fdg_pt)
+        psma_pt = read_nii_tensor(psma_pt)
+
+        # get the size of the original tensor
+        fdg_ct_size = tuple(fdg_ct.shape)
+        psma_ct_size = tuple(psma_ct.shape)
+        fdg_pt_size = tuple(fdg_pt.shape)
+        psma_pt_size= tuple(psma_pt.shape)
+
+
+
+        # cropping by mask
+        fdg_ct = cropAbyB(fdg_ct, fdg_mask)
+        fdg_pt = cropAbyB(fdg_pt, fdg_mask)
+        fdg_mask = cropAbyB(fdg_mask, fdg_mask)
+
+        psma_ct = cropAbyB(psma_ct, psma_mask)
+        psma_pt = cropAbyB(psma_pt, psma_mask)
+        psma_mask = cropAbyB(psma_mask, psma_mask)
+
+        cropped_psma_size = tuple(fdg_ct.shape)
+        cropped_fdg_size = tuple(fdg_ct.shape)
+
+        psma_spacing = compute_new_voxel_dimension(
+            psma_ct_spacing,
+            psma_ct_size,
+            cropped_psma_size
+        )
+
+        fdg_spacing = compute_new_voxel_dimension(
+            fdg_ct_spacing,
+            fdg_ct_size,
+            cropped_fdg_size
+        )
+
+        print(psma_spacing, fdg_spacing)
+
+
+
+        scaler = ScaleIntensityRangePercentiles(lower, upper, b_min, b_max, clip=True)
+        resizer = Resize(img_size, mode="trilinear")
+        resizer_mask = Resize(img_size, mode="nearest-exact")
+
+
+
+        fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
+        fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
+        fdg_mask = resizer_mask(fdg_mask.unsqueeze(0))
+
+
+        psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
+        psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
+        psma_mask = resizer_mask(psma_mask.unsqueeze(0))
+
+
+
+        
+        
+        save_nii(
+            os.path.join(save_dir, f'patient_{idx:04d}'),
+            fdg_ct,
+            fdg_pt,
+            fdg_mask,
+            psma_ct,
+            psma_pt,
+            psma_mask,
+            fdg_spacing,
+            psma_spacing
+        )
+
+
 if __name__ == "__main__":
 
-    crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
-    save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
+    # crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
+    # save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
+    # img_size=(128, 128, 384))
+    
+    crop_and_intensity_debug(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
+    save_dir='/data/xiangcen/pet_gen/processed/debug',
     img_size=(128, 128, 384))
