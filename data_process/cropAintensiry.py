@@ -136,6 +136,8 @@ def crop_and_intensity(patient_dir,
                     b_min=0,
                     b_max=1,):
 
+    os.makedirs(save_dir, exist_ok=True)
+
 
     patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
 
@@ -443,10 +445,14 @@ def crop_and_intensity_debug(patient_dir,
 
 if __name__ == "__main__":
 
-    # crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
-    # save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
-    # img_size=(128, 128, 384))
-    
-    crop_and_intensity_debug(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
-    save_dir='/data/xiangcen/pet_gen/processed/debug',
+    crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
+    save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
     img_size=(128, 128, 384))
+
+    crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch2', 
+    save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
+    img_size=(128, 128, 384))
+    
+    # crop_and_intensity_debug(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
+    # save_dir='/data/xiangcen/pet_gen/processed/debug',
+    # img_size=(128, 128, 384))
