@@ -450,7 +450,7 @@ if __name__ == "__main__":
     img_size=(128, 128, 384))
 
     crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch2', 
-    save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
+    save_dir='/data/xiangcen/pet_gen/processed/batch2_h5',
     img_size=(128, 128, 384))
     
     # crop_and_intensity_debug(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
