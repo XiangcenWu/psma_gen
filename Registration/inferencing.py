@@ -80,7 +80,7 @@ def tre_surface_from_masks(fixed_mask, moving_mask, spacing, threshold=0.5):
     """
     fixed_mask = fixed_mask.squeeze(0).squeeze(0)
     moving_mask = moving_mask.squeeze(0).squeeze(0)
-    
+
     device = fixed_mask.device
     spacing = torch.as_tensor(spacing, device=device, dtype=torch.float32)
 
@@ -253,12 +253,12 @@ def inference_batch(
             binary_mask_psma = get_binary_mask_with_label(psma_mask, mask_idx)
 
             dice_before_lists[idx].append(dice_metric(binary_mask_fdg, binary_mask_psma).cpu().item())
-            tre_before_lists[idx].append(tre_surface_from_masks(binary_mask_fdg, binary_mask_psma, spacing).cpu().item())
+            tre_before_lists[idx].append(tre_surface_from_masks(binary_mask_fdg, binary_mask_psma, spacing))
 
             warpped_fdg_mask = torch.nn.functional.grid_sample(binary_mask_fdg, grid)
 
             dice_after_lists[idx].append(dice_metric(warpped_fdg_mask, binary_mask_psma).cpu().item())
-            tre_after_lists[idx].append(tre_surface_from_masks(warpped_fdg_mask, binary_mask_psma, spacing).cpu().item())
+            tre_after_lists[idx].append(tre_surface_from_masks(warpped_fdg_mask, binary_mask_psma, spacing))
 
 
     save_registration_results(filename, masks_names, dice_before_lists, dice_after_lists, tre_before_lists, tre_after_lists)
