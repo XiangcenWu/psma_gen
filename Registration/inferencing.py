@@ -3,6 +3,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 
 
@@ -55,62 +56,127 @@ def get_binary_mask_with_label(mask: torch.tensor, label: int) -> torch.tensor:
     return mask
 
 
-def summarize_statistics(list1, list2, percentile=95):
+
+def tre_surface_from_masks(fixed_mask, moving_mask, spacing, threshold=0.5):
     """
-    Compute mean, std, and percentile for two lists of numbers.
+    Compute TRE between two 3D masks using surface distances.
 
     Args:
-        list1 (list or array): First list of values (e.g., before warp).
-        list2 (list or array): Second list of values (e.g., after warp).
-        percentile (float): Percentile to calculate (default 95).
+        fixed_mask (torch.Tensor): Fixed mask, shape (D,H,W), binary (0/1).
+        moving_mask (torch.Tensor): Moving mask, shape (D,H,W), probabilistic (0-1).
+        spacing (tuple or list or torch.Tensor): voxel spacing in (z,y,x)
+        threshold (float): threshold for probabilistic moving mask to extract surface
 
     Returns:
-        dict: A dictionary containing statistics for both lists.
+        float: TRE in physical units
     """
-    stats = {}
+    device = fixed_mask.device
+    spacing = torch.tensor(spacing, device=device, dtype=torch.float32)
 
-    for name, lst in zip(["before", "after"], [list1, list2]):
-        arr = np.array(lst)
-        stats[name] = {
-            "mean": np.mean(arr).item(),
-            "std": np.std(arr, ddof=1).item(),  # use ddof=1 for sample std
-            f"{percentile}th_percentile": np.percentile(arr, percentile).item()
-        }
+    # Binarize moving mask
+    moving_bin = (moving_mask >= threshold).float()
+    fixed_bin = (fixed_mask >= threshold).float()
 
-    return stats
+    def extract_surface(mask):
+        # Convolve with 3x3x3 kernel to find boundary voxels
+        kernel = torch.ones((3,3,3), device=device)
+        kernel[1,1,1] = 0
+        neighbor_count = F.conv3d(mask[None,None,...], kernel[None,None,...], padding=1)
+        # Surface = mask voxel with at least one background neighbor
+        surface = mask * (neighbor_count < 26)
+        # Get coordinates of surface voxels
+        coords = surface.nonzero(as_tuple=False).float()  # (N,3)
+        return coords
+
+    fixed_surf = extract_surface(fixed_bin)
+    moving_surf = extract_surface(moving_bin)
+
+    if fixed_surf.shape[0] == 0 or moving_surf.shape[0] == 0:
+        return float('nan')
+
+    # Convert to physical coordinates
+    fixed_phys = fixed_surf * spacing
+    moving_phys = moving_surf * spacing
+
+    # Compute closest distance for each fixed surface point
+    # Efficient computation using broadcasting
+    diff = fixed_phys[:, None, :] - moving_phys[None, :, :]  # (N_fixed, N_moving, 3)
+    dist = torch.norm(diff, dim=2)  # (N_fixed, N_moving)
+    min_dist, _ = dist.min(dim=1)  # min distance for each fixed point
+
+    # TRE = mean of minimum distances
+    tre_value = min_dist.mean().item()
+    return tre_value
 
 
 
-def dice_for_organs(moving: torch.Tensor, fixed: torch.Tensor, organ_names: list, eps: float = 1e-6) -> list:
+
+# def dice_for_organs(moving: torch.Tensor, fixed: torch.Tensor, organ_names: list, eps: float = 1e-6) -> list:
+#     """
+#     Calculate Dice scores for a list of organs using dice_metric.
+
+#     Parameters:
+#         moving: tensor of moving segmentation (H,W,D) or (B,H,W,D)
+#         fixed: tensor of fixed segmentation (same shape as moving)
+#         organ_names: list of strings, organ names in SEGMENT_INDEX
+#         eps: small value to avoid division by zero
+
+#     Returns:
+#         List of Dice scores (float) in the same order as organ_names
+#     """
+#     dice_scores = []
+    
+#     for organ_name in organ_names:
+#         if organ_name not in SEGMENT_INDEX:
+#             raise ValueError(f"Organ '{organ_name}' not in SEGMENT_INDEX")
+        
+#         organ_label = SEGMENT_INDEX[organ_name]
+
+#         # Create binary masks for the organ
+#         moving_mask = (moving == organ_label).float()
+#         fixed_mask = (fixed == organ_label).float()
+
+#         # Compute Dice using dice_metric
+#         dice_score = dice_metric(moving_mask, fixed_mask, eps)
+#         dice_scores.append(dice_score.item())
+    
+#     return dice_scores
+
+
+def save_registration_results(
+    filename, masks_names, dice_before_lists, dice_after_lists, tre_before_lists, tre_after_lists
+):
     """
-    Calculate Dice scores for a list of organs using dice_metric.
+    Save registration results to a text file.
 
     Parameters:
-        moving: tensor of moving segmentation (H,W,D) or (B,H,W,D)
-        fixed: tensor of fixed segmentation (same shape as moving)
-        organ_names: list of strings, organ names in SEGMENT_INDEX
-        eps: small value to avoid division by zero
-
-    Returns:
-        List of Dice scores (float) in the same order as organ_names
+    - filename: str, path to save the text file
+    - masks_names: list of mask names
+    - dice_before_lists: list of lists of dice scores before registration
+    - dice_after_lists: list of lists of dice scores after registration
+    - tre_before_lists: list of lists of TRE before registration
+    - tre_after_lists: list of lists of TRE after registration
     """
-    dice_scores = []
     
-    for organ_name in organ_names:
-        if organ_name not in SEGMENT_INDEX:
-            raise ValueError(f"Organ '{organ_name}' not in SEGMENT_INDEX")
+    # Helper function to convert list of values to a string joined by ";"
+    def list_to_string(lst):
+        return ";".join(str(x) for x in lst)
+    
+    with open(filename, "w") as f:
+        # Write header (mask names)
+        f.write(list_to_string(masks_names) + "\n")
         
-        organ_label = SEGMENT_INDEX[organ_name]
-
-        # Create binary masks for the organ
-        moving_mask = (moving == organ_label).float()
-        fixed_mask = (fixed == organ_label).float()
-
-        # Compute Dice using dice_metric
-        dice_score = dice_metric(moving_mask, fixed_mask, eps)
-        dice_scores.append(dice_score.item())
-    
-    return dice_scores
+        # Write dice before
+        f.write(list_to_string(dice_before_lists) + "\n")
+        
+        # Write dice after
+        f.write(list_to_string(dice_after_lists) + "\n")
+        
+        # Write tre before
+        f.write(list_to_string(tre_before_lists) + "\n")
+        
+        # Write tre after
+        f.write(list_to_string(tre_after_lists) + "\n")
 
 
 @torch.no_grad()
@@ -118,6 +184,7 @@ def inference_batch(
         model,
         loader,
         identity_grid,
+        filename,
         masks_names=list(SEGMENT_INDEX.keys()), # list of names
         device="cuda:0"
     ):
@@ -129,23 +196,19 @@ def inference_batch(
         else:
             raise ValueError(f"Unknown segment names: {name}")
 
-
-    
     model.eval()
     model.to(device)
     identity_grid.to(device)
 
-
-    mi_before = []
-    mi_after = []
-
+    # mi_before = []
+    # mi_after = []
 
     num_of_masks = len(masks_names)
     dice_before_lists = [[] for _ in range(num_of_masks)]
     dice_after_lists = [[] for _ in range(num_of_masks)]
 
-
-
+    tre_before_lists = [[] for _ in range(num_of_masks)]
+    tre_after_lists = [[] for _ in range(num_of_masks)]
 
     for i, batch in enumerate(tqdm(loader, desc="inferencing", total=len(loader))):
         assert batch["fdg_pt"].shape[0] == 1, \
@@ -154,30 +217,26 @@ def inference_batch(
         fdg_pt = batch['fdg_pt'].to(device)
         fdg_mask = batch['fdg_mask'].to(device)
         fdg_spacing = batch['fdg_spacing']
+        fdg_spacing = [t.item() for t in fdg_spacing]
 
         psma_pt = batch['psma_pt'].to(device)
         psma_mask = batch['psma_mask'].to(device)
         psma_spacing = batch['psma_spacing']
+        psma_spacing = [t.item() for t in psma_spacing]
 
-        mi_before.append(mutual_information(fdg_pt, psma_pt).item())
+        spacing = (torch.tensor(fdg_spacing) + torch.tensor(psma_spacing)) / 2
+
+        # mi_before.append(mutual_information(fdg_pt, psma_pt).item())
         
 
-        input = torch.cat([fdg_pt, psma_pt], dim=1)
-
-
-
-
-        ddf = model(input)
+        _input = torch.cat([fdg_pt, psma_pt], dim=1)
+        ddf = model(_input)
         ddf = torch.tanh(ddf)
         grid = identity_grid + ddf
         grid = grid.permute(0, 2, 3, 4, 1)
 
-        # -----------------------------
-        # get pet image's MI 
-        # -----------------------------
-        warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
-
-        mi_after.append(mutual_information(warped_fdg_pt, psma_pt).cpu().item())
+        # warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
+        # mi_after.append(mutual_information(warped_fdg_pt, psma_pt).cpu().item())
         
         for idx, names in enumerate(masks_names):
             mask_idx = mask_list[idx]
@@ -185,19 +244,15 @@ def inference_batch(
             binary_mask_psma = get_binary_mask_with_label(psma_mask, mask_idx)
 
             dice_before_lists[idx].append(dice_metric(binary_mask_fdg, binary_mask_psma).cpu().item())
+            tre_before_lists[idx].append(tre_surface_from_masks(binary_mask_fdg, binary_mask_psma, spacing).cpu().item())
+
             warpped_fdg_mask = torch.nn.functional.grid_sample(binary_mask_fdg, grid)
+
             dice_after_lists[idx].append(dice_metric(warpped_fdg_mask, binary_mask_psma).cpu().item())
+            tre_after_lists[idx].append(tre_surface_from_masks(warpped_fdg_mask, binary_mask_psma, spacing).cpu().item())
 
 
-    stats = summarize_statistics(mi_before, mi_after)
-    print('This is stats for MI')
-    print(stats)
-
-    for idx, names in enumerate(masks_names):
-        print(names)
-        stats = summarize_statistics(dice_before_lists[idx], dice_after_lists[idx])
-        print(stats)
-
-
-
-
+    save_registration_results(filename, masks_names, dice_before_lists, dice_after_lists, tre_before_lists, tre_after_lists)
+    # stats = summarize_statistics(mi_before, mi_after)
+    # print('This is stats for MI')
+    # print(stats)

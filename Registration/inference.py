@@ -29,13 +29,11 @@ def main(args):
         use_v2=True,
     )
 
-    model.load_state_dict(torch.load(args.weights_path, map_location=device))
-
     train_transform = ReadH5d()
 
     train_list, test_list = split_multiple_train_test(
         ['/data1/xiangcen/data/pet_gen/processed/batch1_h5','/data1/xiangcen/data/pet_gen/processed/batch2_h5'],
-        [20, 30]
+        [40, 40]
     )
 
 
@@ -47,13 +45,33 @@ def main(args):
         (128, 128, 384), device=device
     )
 
+    if os.path.isdir(args.weights_path):
+        
+        weights_paths_list = [os.path.join(args.weights_path, _dir) for _dir in os.listdir(args.weights_path)]
+        
 
-    inference_batch(
-        model,
-        test_loader,
-        identity_grid,
-        device=args.device
-    )
+        for weights_path in weights_path_list:
+            # get the file name
+            path = os.path.splitext(os.path.basename(weights_path))[0] + '.txt'
+            filename = os.path.join(args.weights_path, path)
+            print(filename)
+
+            model.load_state_dict(torch.load(weights_path, map_location=device))
+            inference_batch(
+                model,
+                test_loader,
+                identity_grid,
+                filename=filename,
+                device=args.device
+            )
+    else:
+        model.load_state_dict(torch.load(args.weights_path, map_location=device))
+        inference_batch(
+            model,
+            test_loader,
+            identity_grid,
+            device=args.device
+        )
 
 
 
