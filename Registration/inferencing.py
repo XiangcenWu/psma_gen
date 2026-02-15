@@ -57,56 +57,65 @@ def get_binary_mask_with_label(mask: torch.tensor, label: int) -> torch.tensor:
 
 
 
+import torch
+import torch.nn.functional as F
+
+
+import torch
+import torch.nn.functional as F
+
+
 def tre_surface_from_masks(fixed_mask, moving_mask, spacing, threshold=0.5):
     """
-    Compute TRE between two 3D masks using surface distances.
+    Compute symmetric TRE between two 3D masks using surface distances.
 
     Args:
-        fixed_mask (torch.Tensor): Fixed mask, shape (D,H,W), binary (0/1).
-        moving_mask (torch.Tensor): Moving mask, shape (D,H,W), probabilistic (0-1).
-        spacing (tuple or list or torch.Tensor): voxel spacing in (z,y,x)
-        threshold (float): threshold for probabilistic moving mask to extract surface
+        fixed_mask (torch.Tensor): (B, N, D,H,W) binary or probabilistic
+        moving_mask (torch.Tensor): (B, N, D,H,W) binary or probabilistic
+        spacing (sequence): voxel spacing (z,y,x)
+        threshold (float): binarization threshold
 
     Returns:
         float: TRE in physical units
     """
+    fixed_mask = fixed_mask.squeeze(0).squeeze(0)
+    moving_mask = moving_mask.squeeze(0).squeeze(0)
+    
     device = fixed_mask.device
-    spacing = torch.tensor(spacing, device=device, dtype=torch.float32)
+    spacing = torch.as_tensor(spacing, device=device, dtype=torch.float32)
 
-    # Binarize moving mask
-    moving_bin = (moving_mask >= threshold).float()
     fixed_bin = (fixed_mask >= threshold).float()
+    moving_bin = (moving_mask >= threshold).float()
 
     def extract_surface(mask):
-        # Convolve with 3x3x3 kernel to find boundary voxels
-        kernel = torch.ones((3,3,3), device=device)
-        kernel[1,1,1] = 0
-        neighbor_count = F.conv3d(mask[None,None,...], kernel[None,None,...], padding=1)
-        # Surface = mask voxel with at least one background neighbor
-        surface = mask * (neighbor_count < 26)
-        # Get coordinates of surface voxels
-        coords = surface.nonzero(as_tuple=False).float()  # (N,3)
+        kernel = torch.ones((3, 3, 3), device=device)
+        kernel[1, 1, 1] = 0
+
+        neigh = F.conv3d(mask[None, None], kernel[None, None], padding=1)
+        surface = mask * (neigh < 26)
+
+        # keep only z,y,x
+        coords = surface.nonzero(as_tuple=False)[:, 2:].float()
         return coords
 
     fixed_surf = extract_surface(fixed_bin)
     moving_surf = extract_surface(moving_bin)
 
-    if fixed_surf.shape[0] == 0 or moving_surf.shape[0] == 0:
-        return float('nan')
+    if fixed_surf.numel() == 0 or moving_surf.numel() == 0:
+        return float("nan")
 
-    # Convert to physical coordinates
+    # voxel -> physical
     fixed_phys = fixed_surf * spacing
     moving_phys = moving_surf * spacing
 
-    # Compute closest distance for each fixed surface point
-    # Efficient computation using broadcasting
-    diff = fixed_phys[:, None, :] - moving_phys[None, :, :]  # (N_fixed, N_moving, 3)
-    dist = torch.norm(diff, dim=2)  # (N_fixed, N_moving)
-    min_dist, _ = dist.min(dim=1)  # min distance for each fixed point
+    # nearest neighbor distance
+    diff = fixed_phys[:, None, :] - moving_phys[None, :, :]
+    dist = torch.norm(diff, dim=2)
+    min_dist = dist.min(dim=1)[0]
 
-    # TRE = mean of minimum distances
-    tre_value = min_dist.mean().item()
-    return tre_value
+    return min_dist.mean().item()
+
+
 
 
 
