@@ -53,7 +53,7 @@ def main(args):
         for weights_path in weights_paths_list:
             # get the file name
             path = os.path.splitext(os.path.basename(weights_path))[0] + '.txt'
-            filename = os.path.join(args.weights_path, path)
+            filename = os.path.join('/share/homw/xcwu/pet_reg_results', path)
             print(filename)
 
             if os.path.exists(filename):
