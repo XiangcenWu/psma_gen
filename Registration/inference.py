@@ -50,7 +50,7 @@ def main(args):
         weights_paths_list = [os.path.join(args.weights_path, _dir) for _dir in os.listdir(args.weights_path)]
         
 
-        for weights_path in weights_path_list:
+        for weights_path in weights_paths_list:
             # get the file name
             path = os.path.splitext(os.path.basename(weights_path))[0] + '.txt'
             filename = os.path.join(args.weights_path, path)
