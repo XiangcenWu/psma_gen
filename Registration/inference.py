@@ -56,6 +56,9 @@ def main(args):
             filename = os.path.join(args.weights_path, path)
             print(filename)
 
+            if os.path.exists(filename):
+                continue
+
             model.load_state_dict(torch.load(weights_path, map_location=device))
             inference_batch(
                 model,
