@@ -80,36 +80,98 @@ def get_metrics_for_masks(mask_names_input, masks_names, dice_before_lists, dice
     return results
 
 if __name__ == "__main__":
-    from pprint import pprint
-    _dir = r"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l8000_k10_mar3000_gam1.2.txt"
-
-    masks_names, dice_before_lists, dice_after_lists, tre_before_lists, tre_after_lists = load_registration_results(_dir)
-    print(masks_names)
-    # Example usage:
-    organ = 'iliopsoas_right'
-    query_names = [organ]
-    data = get_metrics_for_masks(query_names, masks_names, dice_before_lists, dice_after_lists, tre_before_lists, tre_after_lists)
 
 
     import matplotlib.pyplot as plt
-    import seaborn as sns
+    import numpy as np
 
-    # Combine data for boxplot
-    metrics = ['Dice', 'TRE']
-    before = [data[organ]['dice_before'], data[organ]['tre_before']]
-    after = [data[organ]['dice_after'], data[organ]['tre_after']]
+    def plot_organ_metrics_single_row(masks_names, metric_lists, legend_names, selected_organs):
+        """
+        Plot multiple metrics in a single row grouped by organ.
+        
+        Parameters:
+        -----------
+        masks_names : list of str
+            Names of all organs
+        metric_lists : list of lists of lists
+            List of metric data. Each element is a list of lists containing scores for each organ.
+            Example: [dice_after_lists, tre_after_lists, another_metric_lists]
+        legend_names : list of str
+            Names for each metric to display in legend.
+            Example: ['DICE', 'TRE', 'Another Metric']
+        selected_organs : list of str
+            List of organ names to plot (e.g., ['liver', 'heart', 'kidney_right'])
+        """
+        # Find indices of selected organs
+        selected_indices = [masks_names.index(organ) for organ in selected_organs]
+        
+        # Extract data for selected organs for each metric
+        selected_metrics = []
+        for metric_list in metric_lists:
+            selected_metrics.append([metric_list[i] for i in selected_indices])
+        
+        n_organs = len(selected_organs)
+        n_metrics = len(metric_lists)
+        
+        # Calculate positions for each boxplot
+        group_width = n_metrics * 1.2
+        positions_base = np.arange(n_organs) * (group_width + 1)
+        
+        # Define colors for different metrics
+        colors = ['lightblue', 'lightcoral', 'lightgreen', 'lightyellow', 'lightpink', 'lavender']
+        
+        fig, ax = plt.subplots(figsize=(max(10, n_organs * 2), 6))
+        
+        # Create boxplots for each metric
+        bps = []
+        for i, (selected_data, legend_name) in enumerate(zip(selected_metrics, legend_names)):
+            offset = (i - (n_metrics - 1) / 2) * 0.6
+            positions = positions_base + offset
 
-    # Set up figure
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-    sns.boxplot(data=before + after, ax=axes[0])
-    axes[0].set_xticklabels(['Dice Before', 'TRE Before', 'Dice After', 'TRE After'])
-    axes[0].set_title('Box Plot of Metrics Before and After')
-    axes[0].set_ylabel('Values')
+            selected_data = [np.asarray(d, dtype=float) for d in selected_data]
+            
+            bp = ax.boxplot(selected_data, positions=positions, widths=0.5,
+                        patch_artist=True, label=legend_name,
+                        flierprops=dict(marker='o', markersize=3, linestyle='none', 
+                                    markerfacecolor='black', alpha=0.5))
 
-    # Optional: Separate plots for clarity
-    axes[1].boxplot([data[organ]['dice_before'], data[organ]['dice_after']], labels=['Dice Before', 'Dice After'])
-    axes[1].set_title('Dice Before vs After')
-    axes[1].set_ylabel('Dice Score')
+            
 
-    plt.tight_layout()
-    plt.show()
+
+            
+            # Color the boxes
+            color = colors[i % len(colors)]
+            for patch in bp['boxes']:
+                patch.set_facecolor(color)
+            
+            bps.append(bp)
+        
+        ax.set_xticks(positions_base)
+        ax.set_xticklabels(selected_organs, rotation=90)
+        ax.set_ylabel('Score', fontsize=12)
+        ax.set_title('Metrics by Organ', fontsize=14, fontweight='bold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+# Example usage:
+    
+# plot_organ_metrics_single_row(masks_names, dice_after_lists, tre_after_lists, selected_organs)
+    ctsmoothness_l8000_k10_mar3000_gam1d2 = r"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l8000_k10_mar3000_gam1.2.txt"
+    ctsmoothness_l8000_k10_mar3000_gam1d5 = r"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l8000_k10_mar3000_gam1.5.txt"
+    ctsmoothness_l8000_k10_mar3000_gam2 = r"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l8000_k10_mar3000_gam2.0.txt"
+
+    masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_0 = load_registration_results(ctsmoothness_l8000_k10_mar3000_gam1d2)
+    _, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(ctsmoothness_l8000_k10_mar3000_gam1d5)
+    _, dice_before_lists, dice_after_list2, tre_before_lists, tre_after_lists_2 = load_registration_results(ctsmoothness_l8000_k10_mar3000_gam2)
+    # print(masks_names)
+    selected_organs = ['spleen', 'kidney_right', 'kidney_left', 'gallbladder', 'liver', 'stomach', 'pancreas', 'adrenal_gland_right', 'adrenal_gland_left', 'lung_upper_lobe_left', 'lung_lower_lobe_left', 'lung_upper_lobe_right', 'lung_middle_lobe_right', 'lung_lower_lobe_right', 'esophagus', 'trachea', 'thyroid_gland', 'small_bowel', 'duodenum', 'colon', 'urinary_bladder', 'prostate']
+    plot_organ_metrics_single_row(masks_names, \
+        [dice_after_lists_0, dice_after_lists_1, dice_after_list2], \
+        ['1.2', '1.5', '2'], selected_organs)
+
+    plot_organ_metrics_single_row(masks_names, \
+        [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2], \
+        ['1.2', '1.5', '2'], selected_organs)
+    
