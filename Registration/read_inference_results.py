@@ -85,7 +85,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import numpy as np
 
-    def plot_organ_metrics_single_row(masks_names, metric_lists, legend_names, selected_organs):
+    def plot_organ_metrics_single_row(masks_names, metric_lists, legend_names, selected_organs, title):
         """
         Plot multiple metrics in a single row grouped by organ.
         
@@ -149,29 +149,30 @@ if __name__ == "__main__":
         ax.set_xticks(positions_base)
         ax.set_xticklabels(selected_organs, rotation=90)
         ax.set_ylabel('Score', fontsize=12)
-        ax.set_title('Metrics by Organ', fontsize=14, fontweight='bold')
+        ax.set_title(title, fontsize=14, fontweight='bold')
         ax.legend()
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
         plt.show()
 # Example usage:
-    
+    s = 8000
 # plot_organ_metrics_single_row(masks_names, dice_after_lists, tre_after_lists, selected_organs)
-    ctsmoothness_l8000_k10_mar3000_gam1d2 = r"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l8000_k10_mar3000_gam1.2.txt"
-    ctsmoothness_l8000_k10_mar3000_gam1d5 = r"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l8000_k10_mar3000_gam1.5.txt"
-    ctsmoothness_l8000_k10_mar3000_gam2 = r"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l8000_k10_mar3000_gam2.0.txt"
+    ctsmoothness_l12000_k10_mar3000_gam1d2 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar3000_gam1.2.txt"
+    ctsmoothness_l12000_k10_mar3000_gam1d5 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar3000_gam1.5.txt"
+    ctsmoothness_l12000_k10_mar3000_gam2 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar3000_gam2.0.txt"
+    baseline_l12000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l{s}_k10.txt"
 
-    masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_0 = load_registration_results(ctsmoothness_l8000_k10_mar3000_gam1d2)
-    _, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(ctsmoothness_l8000_k10_mar3000_gam1d5)
-    _, dice_before_lists, dice_after_list2, tre_before_lists, tre_after_lists_2 = load_registration_results(ctsmoothness_l8000_k10_mar3000_gam2)
+    masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_0 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam1d2)
+    _, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam1d5)
+    _, dice_before_lists, dice_after_list2, tre_before_lists, tre_after_lists_2 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam2)
+    _, dice_before_lists, dice_after_list3, tre_before_lists, tre_after_lists_2 = load_registration_results(baseline_l12000_k10)
+    print(_)
     # print(masks_names)
-    selected_organs = ['spleen', 'kidney_right', 'kidney_left', 'gallbladder', 'liver', 'stomach', 'pancreas', 'adrenal_gland_right', 'adrenal_gland_left', 'lung_upper_lobe_left', 'lung_lower_lobe_left', 'lung_upper_lobe_right', 'lung_middle_lobe_right', 'lung_lower_lobe_right', 'esophagus', 'trachea', 'thyroid_gland', 'small_bowel', 'duodenum', 'colon', 'urinary_bladder', 'prostate']
+    selected_organs = ['spleen', 'kidney_right', 'kidney_left', 'liver', 'stomach', 'pancreas', 'adrenal_gland_left', 'lung_upper_lobe_left', 'lung_lower_lobe_left', 'lung_upper_lobe_right', 'lung_middle_lobe_right', 'lung_lower_lobe_right', 'esophagus', 'trachea', 'thyroid_gland', 'small_bowel', 'duodenum', 'colon', 'urinary_bladder', 'prostate']
     plot_organ_metrics_single_row(masks_names, \
-        [dice_after_lists_0, dice_after_lists_1, dice_after_list2], \
-        ['1.2', '1.5', '2'], selected_organs)
+        [dice_after_lists_0, dice_after_lists_1, dice_after_list2, dice_after_list3], \
+        ['1.2', '1.5', '2', 'b'], selected_organs, title = str(s))
 
-    plot_organ_metrics_single_row(masks_names, \
-        [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2], \
-        ['1.2', '1.5', '2'], selected_organs)
+
     

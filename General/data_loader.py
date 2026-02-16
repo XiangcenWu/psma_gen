@@ -57,4 +57,4 @@ class ReadH5d():
 
 def create_data_loader(data_list, transform, batch_size=1, drop_last=False, shuffle=True):
     _dataset = Dataset(data_list, transform)
-    return DataLoader(_dataset, num_workers=8, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
+    return DataLoader(_dataset, num_workers=6, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
