@@ -81,6 +81,7 @@ def compute_tre_single(moving, fixed, voxel_spacing, eps=1e-8):
  
     # ---- Check empty fixed segmentation ----
     fixed_sum = fixed.sum()
+    moving_sum = moving.sum()
     if fixed_sum < 1 or moving_sum < 1:
         return torch.tensor(float(0), device=device)
  
