@@ -57,15 +57,69 @@ def get_binary_mask_with_label(mask: torch.tensor, label: int) -> torch.tensor:
 
 
 
-import torch
-import torch.nn.functional as F
+def compute_tre_single(moving, fixed, voxel_spacing, eps=1e-8):
+    """
+    Compute TRE between one moving and one fixed 3D segmentation.
+ 
+    Args:
+        moving: (1, 1, X, Y, Z) probabilistic segmentation (0–1)
+        fixed:  (1, 1, X, Y, Z) binary segmentation (0 or 1)
+        voxel_spacing: list or tensor [sx, sy, sz]
+        eps: numerical stability
+ 
+    Returns:
+        tre: scalar (physical units, e.g., mm)
+             returns NaN if fixed segmentation is empty
+    """
+ 
+    device = moving.device
+    _, _, X, Y, Z = moving.shape
+ 
+    # Remove batch and channel dims → (X, Y, Z)
+    moving = moving[0, 0]
+    fixed = fixed[0, 0]
+ 
+    # ---- Check empty fixed segmentation ----
+    fixed_sum = fixed.sum()
+    if fixed_sum < 1 or moving_sum < 1:
+        return torch.tensor(float(0), device=device)
+ 
+    # Create coordinate grid
+    xs = torch.arange(X, device=device)
+    ys = torch.arange(Y, device=device)
+    zs = torch.arange(Z, device=device)
+ 
+    grid_x, grid_y, grid_z = torch.meshgrid(xs, ys, zs, indexing="ij")
+ 
+    # ---- Moving centroid (soft) ----
+    moving_sum = moving.sum() + eps
+ 
+    moving_centroid_x = (moving * grid_x).sum() / moving_sum
+    moving_centroid_y = (moving * grid_y).sum() / moving_sum
+    moving_centroid_z = (moving * grid_z).sum() / moving_sum
+ 
+    moving_centroid = torch.stack(
+        [moving_centroid_x, moving_centroid_y, moving_centroid_z]
+    )
+ 
+    # ---- Fixed centroid (binary) ----
+    fixed_centroid_x = (fixed * grid_x).sum() / (fixed_sum + eps)
+    fixed_centroid_y = (fixed * grid_y).sum() / (fixed_sum + eps)
+    fixed_centroid_z = (fixed * grid_z).sum() / (fixed_sum + eps)
+ 
+    fixed_centroid = torch.stack(
+        [fixed_centroid_x, fixed_centroid_y, fixed_centroid_z]
+    )
+ 
+    # ---- Convert to physical space ----
+    voxel_spacing = torch.tensor(voxel_spacing, device=device).float()
+    diff = (moving_centroid - fixed_centroid) * voxel_spacing
+ 
+    tre = torch.norm(diff, p=2)
+ 
+    return tre
 
-
-import torch
-import torch.nn.functional as F
-
-
-def tre_surface_from_masks(fixed_mask, moving_mask, spacing, threshold=0.5):
+def tre_surface_from_masks(fixed_mask, moving_mask, spacing):
     """
     Compute symmetric TRE between two 3D masks using surface distances.
 
@@ -84,8 +138,6 @@ def tre_surface_from_masks(fixed_mask, moving_mask, spacing, threshold=0.5):
     device = fixed_mask.device
     spacing = torch.as_tensor(spacing, device=device, dtype=torch.float32)
 
-    fixed_bin = (fixed_mask >= threshold).float()
-    moving_bin = (moving_mask >= threshold).float()
 
     def extract_surface(mask):
         kernel = torch.ones((3, 3, 3), device=device)
@@ -98,11 +150,11 @@ def tre_surface_from_masks(fixed_mask, moving_mask, spacing, threshold=0.5):
         coords = surface.nonzero(as_tuple=False)[:, 2:].float()
         return coords
 
-    fixed_surf = extract_surface(fixed_bin)
-    moving_surf = extract_surface(moving_bin)
+    fixed_surf = extract_surface(fixed_mask)
+    moving_surf = extract_surface(moving_mask)
 
     if fixed_surf.numel() == 0 or moving_surf.numel() == 0:
-        return float("nan")
+        return torch.tensor(float(0))
 
     # voxel -> physical
     fixed_phys = fixed_surf * spacing
@@ -114,8 +166,6 @@ def tre_surface_from_masks(fixed_mask, moving_mask, spacing, threshold=0.5):
     min_dist = dist.min(dim=1)[0]
 
     return min_dist.mean().item()
-
-
 
 
 
@@ -253,12 +303,12 @@ def inference_batch(
             binary_mask_psma = get_binary_mask_with_label(psma_mask, mask_idx)
 
             dice_before_lists[idx].append(dice_metric(binary_mask_fdg, binary_mask_psma).cpu().item())
-            tre_before_lists[idx].append(tre_surface_from_masks(binary_mask_fdg, binary_mask_psma, spacing))
+            tre_before_lists[idx].append(compute_tre_single(binary_mask_fdg, binary_mask_psma, spacing).cpu().item())
 
             warpped_fdg_mask = torch.nn.functional.grid_sample(binary_mask_fdg, grid)
 
             dice_after_lists[idx].append(dice_metric(warpped_fdg_mask, binary_mask_psma).cpu().item())
-            tre_after_lists[idx].append(tre_surface_from_masks(warpped_fdg_mask, binary_mask_psma, spacing))
+            tre_after_lists[idx].append(compute_tre_single(warpped_fdg_mask, binary_mask_psma, spacing).cpu().item())
 
 
     save_registration_results(filename, masks_names, dice_before_lists, dice_after_lists, tre_before_lists, tre_after_lists)
