@@ -197,49 +197,48 @@ if __name__ == "__main__":
         "femur_right",
         "tibia"
     ]
-    # selected_organs = [
-    #     "brain",
-    #     "skull",
-    #     "thyroid_gland",
-    #     "heart",
-    #     "aorta",
-    #     "lung_upper_lobe_left",   # single lung representation
-    #     "trachea",
-    #     "esophagus",
-    #     "liver",
-    #     "spleen",
-    #     "pancreas",
-    #     "stomach",
-    #     "kidney_left",
-    #     "kidney_right",
-    #     "colon",
-    #     "urinary_bladder",
-    #     "prostate",
-    #     "spinal_cord",
-    #     "vertebrae_L3",
-    #     "inferior_vena_cava"
-    # ]
+    selected_organs = [
+        "brain",
+        "skull",
+        "thyroid_gland",
+        "heart",
+        "aorta",
+        "lung_upper_lobe_left",   # single lung representation
+        "trachea",
+        "esophagus",
+        "liver",
+        "spleen",
+        "pancreas",
+        "stomach",
+        "kidney_left",
+        "kidney_right",
+        "colon",
+        "urinary_bladder",
+        "prostate",
+        "spinal_cord",
+        "vertebrae_L3",
+        "inferior_vena_cava"
+    ]
 # Example usage:
-    s = 12000
+    s = 5000
     margin = 3000
     # plot_organ_metrics_single_row(masks_names, dice_after_lists, tre_after_lists, selected_organs)
     ctsmoothness_l12000_k10_mar3000_gam1 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar{margin}_gam1.0.txt"
-    ctsmoothness_l12000_k10_mar3000_gam1d2 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar{margin}_gam1.2.txt"
-    ctsmoothness_l12000_k10_mar3000_gam1d5 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar{margin}_gam1.5.txt"
     ctsmoothness_l12000_k10_mar3000_gam2 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar{margin}_gam2.0.txt"
     baseline_l12000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l{s}_k10.txt"
 
-    masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_1 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam1)
-    masks_names, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_2 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam1d2)
-    _, dice_before_lists, dice_after_lists_2, tre_before_lists, tre_after_lists_3 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam1d5)
-    _, dice_before_lists, dice_after_list_3, tre_before_lists, tre_after_lists_4 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam2)
-    _, dice_before_lists, dice_after_list_4, tre_before_lists, tre_after_lists_5 = load_registration_results(baseline_l12000_k10)
+    masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_0 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam1)
+    _, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam2)
+    _, dice_before_lists, dice_after_lists_2, tre_before_lists, tre_after_lists_2 = load_registration_results(baseline_l12000_k10)
 
 
    
     plot_organ_metrics_single_row(masks_names, \
-        [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2, dice_after_list_3, dice_after_list_4], \
-        ['1', '1.2', '1.5', '2', 'b'], selected_organs, title = str(s) + str(margin))
+        [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2], \
+        ['1', '2', 'baseline'], selected_organs, title = 'dice' + str(s) + str(margin))
+    plot_organ_metrics_single_row(masks_names, \
+        [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2], \
+        ['1', '2', 'baseline'], selected_organs, title = 'tre' + str(s) + str(margin))
 
 
     
@@ -248,14 +247,22 @@ if __name__ == "__main__":
 
     # baseline_l5000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l5000_k10.txt"
     # baseline_l6000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l6000_k10.txt"
+    # baseline_l7000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l7000_k10.txt"
     # baseline_l8000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l8000_k10.txt"
+    # baseline_l10000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l10000_k10.txt"
     # baseline_l12000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l12000_k10.txt"
 
     # masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_0 = load_registration_results(baseline_l5000_k10)
-    # masks_names, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_0 = load_registration_results(baseline_l6000_k10)
-    # _, dice_before_lists, dice_after_lists_2, tre_before_lists, tre_after_lists_1 = load_registration_results(baseline_l8000_k10)
-    # _, dice_before_lists, dice_after_list_3, tre_before_lists, tre_after_lists_2 = load_registration_results(baseline_l12000_k10)
+    # masks_names, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(baseline_l6000_k10)
+    # masks_names, dice_before_lists, dice_after_lists_2, tre_before_lists, tre_after_lists_2 = load_registration_results(baseline_l7000_k10)
+    # _, dice_before_lists, dice_after_lists_3, tre_before_lists, tre_after_lists_3 = load_registration_results(baseline_l8000_k10)
+    # _, dice_before_lists, dice_after_lists_4, tre_before_lists, tre_after_lists_4 = load_registration_results(baseline_l10000_k10)
+    # _, dice_before_lists, dice_after_list_5, tre_before_lists, tre_after_lists_5 = load_registration_results(baseline_l12000_k10)
 
     # plot_organ_metrics_single_row(masks_names, \
-    #     [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2, dice_after_list_3], \
-    #     ['5000', '6000', '8000', '12000'], selected_organs, title = str(s))
+    #     [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2, dice_after_list_3, dice_after_list_4, dice_after_list_5], \
+    #     ['5000', '6000', '7000', '8000', '10000', '12000'], selected_organs, title = str(s))
+
+    # plot_organ_metrics_single_row(masks_names, \
+    #     [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2, tre_after_lists_3, tre_after_lists_4, tre_after_lists_5], \
+    #     ['5000', '6000', '7000', '8000', '10000', '12000'], selected_organs, title = str(s))
