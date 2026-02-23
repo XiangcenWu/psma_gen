@@ -106,6 +106,20 @@ def generate_warp(
         sitk.WriteImage(fdg_ct_warped_itk, os.path.join(sample_dir, "fdg_ct_warped.nii.gz"))
 
 
+        # ddf shape: (B, 3, D, H, W)
+        ddf_cpu = ddf.detach().cpu()[0]  # remove batch dim → (3, D, H, W)
+
+        # change to (D, H, W, 3) for SimpleITK vector image
+        ddf_np = ddf_cpu.permute(1, 2, 3, 0).numpy()
+
+        ddf_itk = sitk.GetImageFromArray(ddf_np, isVector=True)
+
+        # set spacing (VERY IMPORTANT)
+        ddf_itk.SetSpacing([t.item() for t in fdg_spacing])
+
+        sitk.WriteImage(ddf_itk, os.path.join(sample_dir, "ddf.nii.gz"))
+
+
 def main(args):
     device = args.device
 
