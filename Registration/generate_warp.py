@@ -137,9 +137,10 @@ def main(args):
     train_transform = ReadH5d()
 
     train_list, test_list = split_multiple_train_test(
-        ['/data1/xiangcen/data/pet_gen/processed/batch1_h5', '/data1/xiangcen/data/pet_gen/processed/batch2_h5'],
-        [20, 30]
+        ['/data1/xiangcen/data/pet_gen/processed/batch1_h5','/data1/xiangcen/data/pet_gen/processed/batch2_h5'],
+        [40, 40]
     )
+
 
 
     test_loader = create_data_loader(
