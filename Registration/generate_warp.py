@@ -39,7 +39,7 @@ def generate_warp(
         result_dir,
         device="cuda:0"
     ):
-
+#################3 i need to save also the un warped images
 
     
     model.eval()
@@ -50,6 +50,8 @@ def generate_warp(
 
 
     for i, batch in enumerate(tqdm(loader, desc="Generating warps", total=len(loader))):
+        if i > 5:
+            break
         assert batch["fdg_pt"].shape[0] == 1, \
                 f"Expected batch size 1, got {batch['fdg_pt'].shape[0]}"
 
