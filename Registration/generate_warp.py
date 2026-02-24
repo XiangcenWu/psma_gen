@@ -96,6 +96,10 @@ def generate_warp(
         fdg_mask_warped_itk = tensor_to_itk(warped_fdg_mask, [t.item() for t in fdg_spacing])
         fdg_ct_warped_itk = tensor_to_itk(warped_fdg_ct, [t.item() for t in fdg_spacing])
 
+        fdg_pt_itk = tensor_to_itk(fdg_pt, [t.item() for t in fdg_spacing])
+        fdg_mask_itk = tensor_to_itk(fdg_mask, [t.item() for t in fdg_spacing])
+        fdg_ct_itk = tensor_to_itk(fdg_ct, [t.item() for t in fdg_spacing])
+
 
         sitk.WriteImage(psma_pt_itk, os.path.join(sample_dir, "psma_pt.nii.gz"))
         sitk.WriteImage(psma_mask_itk, os.path.join(sample_dir, "psma_ct_mask.nii.gz"))
@@ -105,6 +109,9 @@ def generate_warp(
         sitk.WriteImage(fdg_mask_warped_itk, os.path.join(sample_dir, "fdg_mask_warped.nii.gz"))
         sitk.WriteImage(fdg_ct_warped_itk, os.path.join(sample_dir, "fdg_ct_warped.nii.gz"))
 
+        sitk.WriteImage(fdg_pt_itk, os.path.join(sample_dir, "fdg_pt.nii.gz"))
+        sitk.WriteImage(fdg_mask_itk, os.path.join(sample_dir, "fdg_mask.nii.gz"))
+        sitk.WriteImage(fdg_ct_itk, os.path.join(sample_dir, "fdg_ct.nii.gz"))
 
         # ddf shape: (B, 3, D, H, W)
         ddf_cpu = ddf.detach().cpu()[0]  # remove batch dim → (3, D, H, W)
