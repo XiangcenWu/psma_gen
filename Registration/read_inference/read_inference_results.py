@@ -1,4 +1,5 @@
 import ast
+import numpy as np
 
 
 def load_registration_results(filename):
@@ -83,7 +84,7 @@ if __name__ == "__main__":
 
 
     import matplotlib.pyplot as plt
-    import numpy as np
+    from matplotlib.patches import Patch
 
     def plot_organ_metrics_single_row(masks_names, metric_lists, legend_names, selected_organs, title):
         """
@@ -156,54 +157,106 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.show()
 
-    selected_organs = [
-        # Skull
-        "skull",
 
-        # Cervical landmark
-        "vertebrae_C1",   # atlas
-        "vertebrae_C2",   # axis
+    def plot_separate_legend(legend_names, colors, ncol=None, figsize=(4, 1.2), fontsize=10, frameon=False):
+        handles = [Patch(facecolor=colors[i], edgecolor='black') for i in range(len(legend_names))]
 
-        # Thoracic reference
-        "vertebrae_T12",
+        fig_leg = plt.figure(figsize=figsize)
+        fig_leg.legend(
+            handles, legend_names,
+            loc="center",
+            ncol=(len(legend_names) if ncol is None else ncol),
+            fontsize=fontsize,
+            frameon=frameon,
+            columnspacing=1.2,
+            handlelength=1.5,
+            handletextpad=0.6
+        )
+        plt.axis("off")
+        fig_leg.tight_layout()
+        plt.show()
+        return fig_leg
 
-        # Lumbar reference
-        "vertebrae_L3",
-        "vertebrae_L5",
+    def plot_organ_metrics_single_row_horizontal(
+        masks_names, metric_lists, legend_names, selected_organs, title,
+        box_thickness=0.9,   # <<< control thickness here
+        metric_spacing=0.9,  # <<< controls separation between metrics in a group
+        yaxis=False
+    ):
+        selected_indices = [masks_names.index(organ) for organ in selected_organs]
 
-        # Sacral region
-        "sacrum",
+        selected_metrics = []
+        for metric_list in metric_lists:
+            selected_metrics.append([metric_list[i] for i in selected_indices])
 
-        # Thoracic cage
-        "sternum",
-        "rib_left_1",
-        "rib_right_1",
+        n_organs = len(selected_organs)
+        n_metrics = len(metric_lists)
 
-        # Shoulder girdle
-        "clavicula_left",
-        "clavicula_right",
-        "scapula_left",
-        "scapula_right",
+        group_height = n_metrics * 1.2
+        positions_base = np.arange(n_organs) * (group_height + 1)
 
-        # Upper limb long bone
-        "humerus_left",
+        colors = ['tab:blue', 'tab:gray', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+        plot_separate_legend(legend_names, colors, ncol=len(legend_names), figsize=(6, 1.2))
 
-        # Pelvis
-        "hip_left",
-        "hip_right",
+        # fig, ax = plt.subplots(figsize=(10, max(6, n_organs * 0.6)))
+        fig, ax = plt.subplots(figsize=(6, 4))
 
-        # Lower limb long bones
-        "femur_left",
-        "femur_right",
-        "tibia"
-    ]
+        for i, (selected_data, legend_name) in enumerate(zip(selected_metrics, legend_names)):
+            offset = (i - (n_metrics - 1) / 2) * metric_spacing
+            positions = positions_base + offset
+
+            selected_data = [np.asarray(d, dtype=float) for d in selected_data]
+
+            bp = ax.boxplot(
+                selected_data,
+                positions=positions,
+                widths=box_thickness,   # <<< thicker boxes
+                vert=False,
+                patch_artist=True,
+                labels=None,
+                showfliers=False,
+                flierprops=dict(
+                    marker='o',
+                    markersize=3,
+                    linestyle='none',
+                    markerfacecolor='black',
+                    alpha=0.5
+                )
+            )
+
+            color = colors[i % len(colors)]
+            for patch in bp['boxes']:
+                patch.set_facecolor(color)
+
+            ax.plot([], [], color=color, label=legend_name)
+        if yaxis == True:
+            ax.set_yticks(positions_base)
+            clean_organs = [o.replace("_", " ") for o in selected_organs]
+            ax.set_yticklabels(clean_organs)
+        else:
+                ax.set_yticks([])
+                ax.set_yticklabels([])
+                ax.spines["left"].set_visible(False)
+                ax.tick_params(left=False)
+
+        
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.tick_params(top=False, right=False)
+
+        # ax.set_xlabel('Score', fontsize=12)
+        # ax.set_title(title, fontsize=14, fontweight='bold')
+        # ax.legend()
+        ax.grid(False)
+
+        plt.tight_layout()
+        plt.show()
     selected_organs = [
         "brain",
         "skull",
-        "thyroid_gland",
         "heart",
         "aorta",
-        "lung_upper_lobe_left",   # single lung representation
         "trachea",
         "esophagus",
         "liver",
@@ -217,21 +270,11 @@ if __name__ == "__main__":
         "prostate",
         "spinal_cord",
         "vertebrae_L3",
-        "inferior_vena_cava"
     ]
 
-    # selected_organs = [
-    #     "brain",
-    #     "skull",
-    #     "lung_upper_lobe_left",
-    #     "liver",
-    #     "hip_left",
-    #     "prostate",
-    #     "vertebrae_L3"
 
-    # ]
 # Example usage:
-    s = 7000
+    s = 4500
     margin = 3000
     # plot_organ_metrics_single_row(masks_names, dice_after_lists, tre_after_lists, selected_organs)
     ctsmoothness_l12000_k10_mar3000_gam1 = fr"C:\Users\Sam\Downloads\pet_reg_results\ctsmoothness_l{s}_k10_mar{margin}_gam1.0.txt"
@@ -242,38 +285,76 @@ if __name__ == "__main__":
     _, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(ctsmoothness_l12000_k10_mar3000_gam2)
     _, dice_before_lists, dice_after_lists_2, tre_before_lists, tre_after_lists_2 = load_registration_results(baseline_l12000_k10)
 
-
+    print(len(dice_after_lists_0))
    
-    plot_organ_metrics_single_row(masks_names, \
+    plot_organ_metrics_single_row_horizontal(masks_names, \
         [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2], \
-        ['1', '2', 'baseline'], selected_organs, title = 'dice' + str(s) + str(margin))
-    plot_organ_metrics_single_row(masks_names, \
+        [r'$\gamma=1$', r'$\gamma=2$', 'baseline'], selected_organs, title = 'dice' + str(s) + str(margin), yaxis=True)
+    plot_organ_metrics_single_row_horizontal(masks_names, \
         [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2], \
-        ['1', '2', 'baseline'], selected_organs, title = 'tre' + str(s) + str(margin))
+        [r'$\gamma=1$', r'$\gamma=2$', 'baseline'], selected_organs, title = 'tre' + str(s) + str(margin), yaxis=False)
 
 
-    
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    # Labels and colors (edit as needed)
+    legend_names = ["p < 0.05", "p < 0.001", "insignificant"]
+    colors = ['tab:purple', 'tab:red', 'tab:brown']
+
+    # Create dot handles
+    handles = [
+        Line2D([0], [0],
+            marker="o", linestyle="None",
+            markerfacecolor=c, markeredgecolor=c,
+            markersize=12)
+        for c in colors
+    ]
+
+    # Legend-only figure
+    fig_leg = plt.figure(figsize=(6, 1.2))
+    fig_leg.legend(
+        handles, legend_names,
+        loc="center",
+        ncol=len(legend_names),
+        frameon=False,
+        fontsize=10,
+        columnspacing=1.5,
+        handletextpad=0.6
+    )
+
+    plt.axis("off")
+    plt.tight_layout()
+    plt.show()
 
 
+    # selected_organs = [
+    #     "brain",
+    #     "skull",
+    #     "lung_upper_lobe_left",
+    #     "liver",
+    #     "hip_left",
+    #     "prostate",
+    #     "vertebrae_L3"
+    # ]
+    # baseline_l5000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l4000_k10.txt"
+    # baseline_l6000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l4500_k10.txt"
+    # baseline_l7000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l5000_k10.txt"
+    # baseline_l8000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l5500_k10.txt"
+    # baseline_l10000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l6000_k10.txt"
+    # baseline_l12000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l7000_k10.txt"
 
-    baseline_l5000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l4000_k10.txt"
-    baseline_l6000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l4500_k10.txt"
-    baseline_l7000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l5000_k10.txt"
-    baseline_l8000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l5500_k10.txt"
-    baseline_l10000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l6000_k10.txt"
-    baseline_l12000_k10 = fr"C:\Users\Sam\Downloads\pet_reg_results\baseline_l7000_k10.txt"
+    # masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_0 = load_registration_results(baseline_l5000_k10)
+    # masks_names, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(baseline_l6000_k10)
+    # masks_names, dice_before_lists, dice_after_lists_2, tre_before_lists, tre_after_lists_2 = load_registration_results(baseline_l7000_k10)
+    # _, dice_before_lists, dice_after_list_3, tre_before_lists, tre_after_lists_3 = load_registration_results(baseline_l8000_k10)
+    # _, dice_before_lists, dice_after_list_4, tre_before_lists, tre_after_lists_4 = load_registration_results(baseline_l10000_k10)
+    # _, dice_before_lists, dice_after_list_5, tre_before_lists, tre_after_lists_5 = load_registration_results(baseline_l12000_k10)
 
-    masks_names, dice_before_lists, dice_after_lists_0, tre_before_lists, tre_after_lists_0 = load_registration_results(baseline_l5000_k10)
-    masks_names, dice_before_lists, dice_after_lists_1, tre_before_lists, tre_after_lists_1 = load_registration_results(baseline_l6000_k10)
-    masks_names, dice_before_lists, dice_after_lists_2, tre_before_lists, tre_after_lists_2 = load_registration_results(baseline_l7000_k10)
-    _, dice_before_lists, dice_after_list_3, tre_before_lists, tre_after_lists_3 = load_registration_results(baseline_l8000_k10)
-    _, dice_before_lists, dice_after_list_4, tre_before_lists, tre_after_lists_4 = load_registration_results(baseline_l10000_k10)
-    _, dice_before_lists, dice_after_list_5, tre_before_lists, tre_after_lists_5 = load_registration_results(baseline_l12000_k10)
+    # plot_organ_metrics_single_row(masks_names, \
+    #     [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2, dice_after_list_3, dice_after_list_4, dice_after_list_5], \
+    #     ['4000', '4500', '5000', '5500', '6000', '7000'], selected_organs, title = str(s))
 
-    plot_organ_metrics_single_row(masks_names, \
-        [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2, dice_after_list_3, dice_after_list_4, dice_after_list_5], \
-        ['4000', '4500', '5000', '5500', '6000', '7000'], selected_organs, title = str(s))
-
-    plot_organ_metrics_single_row(masks_names, \
-        [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2, tre_after_lists_3, tre_after_lists_4, tre_after_lists_5], \
-        ['4000', '4500', '5000', '5500', '6000', '7000'], selected_organs, title = str(s))
+    # plot_organ_metrics_single_row(masks_names, \
+    #     [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2, tre_after_lists_3, tre_after_lists_4, tre_after_lists_5], \
+    #     ['4000', '4500', '5000', '5500', '6000', '7000'], selected_organs, title = str(s))

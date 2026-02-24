@@ -316,3 +316,149 @@ def inference_batch(
     # stats = summarize_statistics(mi_before, mi_after)
     # print('This is stats for MI')
     # print(stats)
+
+
+
+
+
+
+def mutual_information(x: torch.Tensor,
+                       y: torch.Tensor,
+                       num_bins: int = 64,
+                       eps: float = 1e-10) -> torch.Tensor:
+    """
+    Mutual information for two tensors (B,1,D,H,W) or (B,D,H,W) etc.
+    Uses a (soft-ish) discrete histogram on CPU/GPU via torch.bucketize.
+
+    Returns: scalar tensor (averaged over batch).
+    """
+    # Ensure same shape
+    if x.shape != y.shape:
+        raise ValueError(f"Shape mismatch: {x.shape} vs {y.shape}")
+
+    # Flatten per-batch
+    B = x.shape[0]
+    x = x.reshape(B, -1)
+    y = y.reshape(B, -1)
+
+    mi_vals = []
+    for b in range(B):
+        xb = x[b]
+        yb = y[b]
+
+        # Mask invalid values if any
+        mask = torch.isfinite(xb) & torch.isfinite(yb)
+        xb = xb[mask]
+        yb = yb[mask]
+        if xb.numel() == 0:
+            mi_vals.append(torch.zeros((), device=x.device, dtype=torch.float32))
+            continue
+
+        # Compute bin edges from combined min/max (stable for different scales)
+        vmin = torch.min(torch.min(xb), torch.min(yb))
+        vmax = torch.max(torch.max(xb), torch.max(yb))
+        if (vmax - vmin).abs() < eps:
+            mi_vals.append(torch.zeros((), device=x.device, dtype=torch.float32))
+            continue
+
+        edges = torch.linspace(vmin, vmax, steps=num_bins + 1, device=x.device)
+
+        # Digitize -> [0, num_bins-1]
+        x_idx = torch.bucketize(xb, edges, right=False) - 1
+        y_idx = torch.bucketize(yb, edges, right=False) - 1
+        x_idx = x_idx.clamp(0, num_bins - 1)
+        y_idx = y_idx.clamp(0, num_bins - 1)
+
+        # Joint histogram
+        joint = torch.zeros((num_bins, num_bins), device=x.device, dtype=torch.float32)
+        joint.index_put_((x_idx, y_idx), torch.ones_like(x_idx, dtype=torch.float32), accumulate=True)
+
+        # Normalize to probabilities
+        pxy = joint / (joint.sum() + eps)
+        px = pxy.sum(dim=1, keepdim=True)
+        py = pxy.sum(dim=0, keepdim=True)
+
+        # MI = sum pxy * log(pxy / (px*py))
+        denom = (px @ py) + eps
+        mi = (pxy * torch.log((pxy + eps) / denom)).sum()
+        mi_vals.append(mi)
+
+    return torch.stack(mi_vals).mean()
+
+
+def normalized_cross_correlation(x: torch.Tensor,
+                                 y: torch.Tensor,
+                                 eps: float = 1e-8) -> torch.Tensor:
+    """
+    Normalized cross-correlation (Pearson correlation) for two tensors.
+    Returns scalar tensor averaged over batch.
+    """
+    if x.shape != y.shape:
+        raise ValueError(f"Shape mismatch: {x.shape} vs {y.shape}")
+
+    B = x.shape[0]
+    x = x.reshape(B, -1)
+    y = y.reshape(B, -1)
+
+    # Mask invalids per batch
+    ncc_vals = []
+    for b in range(B):
+        xb = x[b]
+        yb = y[b]
+        mask = torch.isfinite(xb) & torch.isfinite(yb)
+        xb = xb[mask]
+        yb = yb[mask]
+        if xb.numel() == 0:
+            ncc_vals.append(torch.zeros((), device=x.device, dtype=torch.float32))
+            continue
+
+        xb = xb - xb.mean()
+        yb = yb - yb.mean()
+        num = (xb * yb).mean()
+        den = torch.sqrt((xb * xb).mean() * (yb * yb).mean()) + eps
+        ncc_vals.append(num / den)
+
+    return torch.stack(ncc_vals).mean()
+@torch.no_grad()
+def inference_batch_whole_body(
+        model,
+        loader,
+        identity_grid,
+        masks_names=list(SEGMENT_INDEX.keys()), # list of names
+        device="cuda:0"
+    ):
+
+
+
+    model.eval()
+    model.to(device)
+    identity_grid.to(device)
+
+
+    mi = []
+    ncc = []
+
+    for i, batch in enumerate(tqdm(loader, desc="inferencing", total=len(loader))):
+        assert batch["fdg_pt"].shape[0] == 1, \
+                f"Expected batch size 1, got {batch['fdg_pt'].shape[0]}"
+
+        fdg_pt = batch['fdg_pt'].to(device)
+        fdg_ct = batch['fdg_ct'].to(device)
+
+
+        psma_pt = batch['psma_pt'].to(device)
+        psma_ct = batch['psma_ct'].to(device)
+
+
+        _input = torch.cat([fdg_pt, psma_pt], dim=1)
+        ddf = model(_input)
+        ddf = torch.tanh(ddf)
+        grid = identity_grid + ddf
+        grid = grid.permute(0, 2, 3, 4, 1)
+
+        warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
+        mi.append(mutual_information(warped_fdg_pt, psma_pt).cpu().item())
+
+        warped_fdg_ct = torch.nn.functional.grid_sample(fdg_pt, grid)
+        ncc.append(normalized_cross_correlation(warped_fdg_pt, psma_pt).cpu().item())
+
