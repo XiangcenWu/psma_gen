@@ -148,13 +148,21 @@ if __name__ == "__main__":
             bps.append(bp)
         
         ax.set_xticks(positions_base)
-        ax.set_xticklabels(selected_organs, rotation=90)
-        ax.set_ylabel('Score', fontsize=12)
-        ax.set_title(title, fontsize=14, fontweight='bold')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
+        ax.set_xticklabels([o.replace("_", " ") for o in selected_organs],  rotation=45, ha='right', rotation_mode='anchor')
+        # ax.set_ylabel('Score', fontsize=12)
+        # ax.set_title(title, fontsize=14, fontweight='bold')
+
+        ax.set_ylim(0, 1)
+        ax.set_yticks(np.arange(0, 1.01, 0.1))
+        ax.legend(
+            ncol=len(legend_names),              # one row
+        )
+        # ax.grid(True, alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+                
         plt.tight_layout()
+        plt.subplots_adjust(bottom=0.4, left=0.1)   # increase if still clipped (e.g., 0.38)
         plt.show()
 
 
@@ -287,45 +295,45 @@ if __name__ == "__main__":
 
     print(len(dice_after_lists_0))
    
-    plot_organ_metrics_single_row_horizontal(masks_names, \
+    plot_organ_metrics_single_row(masks_names, \
         [dice_after_lists_0, dice_after_lists_1, dice_after_lists_2], \
-        [r'$\gamma=1$', r'$\gamma=2$', 'baseline'], selected_organs, title = 'dice' + str(s) + str(margin), yaxis=True)
-    plot_organ_metrics_single_row_horizontal(masks_names, \
-        [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2], \
-        [r'$\gamma=1$', r'$\gamma=2$', 'baseline'], selected_organs, title = 'tre' + str(s) + str(margin), yaxis=False)
+        [r'$\gamma=1$', r'$\gamma=2$', 'baseline'], selected_organs, title = 'dice' + str(s) + str(margin))
+    # plot_organ_metrics_single_row_horizontal(masks_names, \
+    #     [tre_after_lists_0, tre_after_lists_1, tre_after_lists_2], \
+    #     [r'$\gamma=1$', r'$\gamma=2$', 'baseline'], selected_organs, title = 'tre' + str(s) + str(margin), yaxis=False)
 
 
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
+    # import matplotlib.pyplot as plt
+    # from matplotlib.lines import Line2D
 
-    # Labels and colors (edit as needed)
-    legend_names = ["p < 0.05", "p < 0.001", "insignificant"]
-    colors = ['tab:purple', 'tab:red', 'tab:brown']
+    # # Labels and colors (edit as needed)
+    # legend_names = ["p < 0.05", "p < 0.001", "insignificant"]
+    # colors = ['tab:purple', 'tab:red', 'tab:green']
 
-    # Create dot handles
-    handles = [
-        Line2D([0], [0],
-            marker="o", linestyle="None",
-            markerfacecolor=c, markeredgecolor=c,
-            markersize=12)
-        for c in colors
-    ]
+    # # Create dot handles
+    # handles = [
+    #     Line2D([0], [0],
+    #         marker="o", linestyle="None",
+    #         markerfacecolor=c, markeredgecolor=c,
+    #         markersize=12)
+    #     for c in colors
+    # ]
 
-    # Legend-only figure
-    fig_leg = plt.figure(figsize=(6, 1.2))
-    fig_leg.legend(
-        handles, legend_names,
-        loc="center",
-        ncol=len(legend_names),
-        frameon=False,
-        fontsize=10,
-        columnspacing=1.5,
-        handletextpad=0.6
-    )
+    # # Legend-only figure
+    # fig_leg = plt.figure(figsize=(6, 1.2))
+    # fig_leg.legend(
+    #     handles, legend_names,
+    #     loc="center",
+    #     ncol=len(legend_names),
+    #     frameon=False,
+    #     fontsize=10,
+    #     columnspacing=1.5,
+    #     handletextpad=0.6
+    # )
 
-    plt.axis("off")
-    plt.tight_layout()
-    plt.show()
+    # plt.axis("off")
+    # plt.tight_layout()
+    # plt.show()
 
 
     # selected_organs = [
