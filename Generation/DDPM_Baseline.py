@@ -21,8 +21,11 @@ class DDPMScheduler:
         self.alphas_cumprod_prev = torch.cat([torch.tensor([1.0]), self.alphas_cumprod[:-1]])
         
         # 用于采样的计算
+        # sqrt(alpht_bar)
         self.sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
+        # sqrt(1 - alpht_bar)
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod)
+
         self.sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
         
         # 后验方差
@@ -32,8 +35,8 @@ class DDPMScheduler:
     
     def add_noise(self, original, noise, timesteps):
         """添加噪声到原始图像"""
-        sqrt_alpha_prod = self.sqrt_alphas_cumprod[timesteps].view(-1, 1, 1, 1, 1)
-        sqrt_one_minus_alpha_prod = self.sqrt_one_minus_alphas_cumprod[timesteps].view(-1, 1, 1, 1, 1)
+        sqrt_alpha_prod = self.sqrt_alphas_cumprod[timesteps].view(-1, 1)
+        sqrt_one_minus_alpha_prod = self.sqrt_one_minus_alphas_cumprod[timesteps].view(-1, 1)
         
         noisy = sqrt_alpha_prod.to(original.device) * original + \
                 sqrt_one_minus_alpha_prod.to(original.device) * noise
@@ -93,7 +96,7 @@ class CTtoPETDiffusion:
             
             use_flash_attention = True
         ).to(device)
-        print(count_parameters(model=self.model))
+
         # 初始化调度器
         self.scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
         self.device=device
@@ -286,43 +289,3 @@ def inference(ct_images, model_path, num_inference_steps=50, device='cuda'):
     
     return generated_pet.cpu().numpy()
 
-
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-# 使用示例
-if __name__ == "__main__":
-    """
-    # 1. 准备数据加载器（你需要实现这部分）
-    # 假设你的数据加载器返回 (ct_images, pet_images)
-    # ct_images: (B, 1, D, H, W) - CT图像
-    # pet_images: (B, 1, D, H, W) - PET图像
-    
-    from your_dataset import get_dataloaders
-    train_loader, val_loader = get_dataloaders(batch_size=2)
-    
-    # 2. 训练模型
-    diffusion = train(
-        train_loader=train_loader,
-        val_loader=val_loader,
-        num_epochs=100,
-        learning_rate=1e-4,
-        save_dir='./checkpoints',
-        device='cuda'
-    )
-    
-    # 3. 推理
-    # 加载测试CT图像
-    test_ct = torch.randn(1, 1, 64, 128, 128)  # 示例数据
-    
-    # 生成PET
-    generated_pet = inference(
-        ct_images=test_ct,
-        model_path='./checkpoints/best_model.pth',
-        num_inference_steps=50,
-        device='cuda'
-    )
-    
-    print(f"Generated PET shape: {generated_pet.shape}")
-    """
-    pass
