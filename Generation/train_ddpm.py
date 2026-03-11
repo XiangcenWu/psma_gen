@@ -190,8 +190,12 @@ def main(args):
         print(
             f"Epoch {epoch:03d} | Train Loss = {train_loss:.6f}"
         )
+        
+        diffusion.save(save_dir / "intermediate_model.pth")
+        print('intermediate model saved')
 
     diffusion.save(save_dir / "final_model.pth")
+    print('final model saved')
 
 
 if __name__ == "__main__":

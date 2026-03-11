@@ -75,27 +75,23 @@ class CTtoPETDiffusion:
         spatial_dims=3,
         in_channels=2,
         out_channels=1,
-        num_res_blocks=1,           # 减少残差块
-        channels=(8, 8),          # 只有2层！
-        attention_levels=(False, False),  # 长度=2
         num_train_timesteps=1000,
         device='cuda'
     ):
         self.device = device
         self.model = DiffusionModelUNet(
-            spatial_dims=spatial_dims,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            num_res_blocks=num_res_blocks,
-            channels=channels,
-            attention_levels=attention_levels,
-            norm_num_groups=8,       # 必须整除最小 channel (16)
-            with_conditioning=False,
-            resblock_updown=True,
-            num_head_channels=8,     # 虽然不用 attention，但需设小值
-            
-            use_flash_attention = True
-        ).to(device)
+        spatial_dims=spatial_dims,
+        in_channels=in_channels,
+        out_channels=out_channels,
+        num_res_blocks=(2, 2, 2, 2),
+        channels=(32, 64, 64, 64),
+        attention_levels=(False, False, True, True),
+        norm_num_groups=8,
+        with_conditioning=False,
+        resblock_updown=True,
+        num_head_channels=8,
+        use_flash_attention=True,
+    ).to(self.device)
 
         # 初始化调度器
         self.scheduler = DDPMScheduler(num_train_timesteps=num_train_timesteps)
