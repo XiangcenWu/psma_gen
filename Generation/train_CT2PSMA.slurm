@@ -19,7 +19,7 @@ python Generation/train_ddpm.py \
     --val-counts 40 40 \
     --input-key psma_ct \
     --target-key psma_pt \
-    --epochs 200 \
+    --epochs 1000 \
     --batch-size 1 \
     --lr 1e-4 \
     --save-dir /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt \

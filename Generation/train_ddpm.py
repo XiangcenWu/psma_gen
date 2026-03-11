@@ -191,11 +191,11 @@ def main(args):
             f"Epoch {epoch:03d} | Train Loss = {train_loss:.6f}"
         )
         
-        diffusion.save(save_dir / "intermediate_model.pth")
-        print('intermediate model saved')
-
-    diffusion.save(save_dir / "final_model.pth")
-    print('final model saved')
+        # 策略：每 100 个 epoch 保存一个带版本号的模型，并在最后一个 epoch 强制保存
+        if (epoch + 1) % 100 == 0 or epoch == args.epochs - 1:
+            save_path = save_dir / f"model_epoch_{epoch + 1}.pth"
+            diffusion.save(save_path)
+            print(f'>>> Checkpoint saved: {save_path}')
 
 
 if __name__ == "__main__":
