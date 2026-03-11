@@ -78,12 +78,12 @@ def get_pair(batch, input_key, target_key, device):
 
 def add_noise_3d(diffusion, target, noise, timesteps):
     view_shape = (timesteps.shape[0],) + (1,) * (target.ndim - 1)
-    alpha = diffusion.scheduler.sqrt_alphas_cumprod[timesteps].to(target.device).view(
-        view_shape
-    )
-    sigma = diffusion.scheduler.sqrt_one_minus_alphas_cumprod[timesteps].to(
-        target.device
-    ).view(view_shape)
+    alpha_schedule = diffusion.scheduler.sqrt_alphas_cumprod
+    sigma_schedule = diffusion.scheduler.sqrt_one_minus_alphas_cumprod
+    schedule_timesteps = timesteps.to(alpha_schedule.device)
+
+    alpha = alpha_schedule[schedule_timesteps].to(target.device).view(view_shape)
+    sigma = sigma_schedule[schedule_timesteps].to(target.device).view(view_shape)
     return alpha * target + sigma * noise
 
 
