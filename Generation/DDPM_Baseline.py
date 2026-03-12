@@ -175,113 +175,113 @@ class CTtoPETDiffusion:
         print(f"Model loaded from {path}")
 
 
-def train(
-    train_loader,
-    val_loader=None,
-    num_epochs=100,
-    learning_rate=1e-4,
-    save_dir='./checkpoints',
-    device='cuda'
-):
-    """训练函数"""
-    # 创建保存目录
-    save_dir = Path(save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
+# def train(
+#     train_loader,
+#     val_loader=None,
+#     num_epochs=100,
+#     learning_rate=1e-4,
+#     save_dir='./checkpoints',
+#     device='cuda'
+# ):
+#     """训练函数"""
+#     # 创建保存目录
+#     save_dir = Path(save_dir)
+#     save_dir.mkdir(parents=True, exist_ok=True)
     
-    # 初始化模型
-    diffusion = CTtoPETDiffusion(device=device)
+#     # 初始化模型
+#     diffusion = CTtoPETDiffusion(device=device)
     
-    # 优化器
-    optimizer = optim.AdamW(diffusion.model.parameters(), lr=learning_rate)
+#     # 优化器
+#     optimizer = optim.AdamW(diffusion.model.parameters(), lr=learning_rate)
     
-    # 学习率调度器
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+#     # 学习率调度器
+#     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
     
-    best_val_loss = float('inf')
+#     best_val_loss = float('inf')
     
-    for epoch in range(num_epochs):
-        # 训练
-        train_losses = []
-        pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}')
+#     for epoch in range(num_epochs):
+#         # 训练
+#         train_losses = []
+#         pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}')
         
-        for batch in pbar:
-            # 假设batch是(ct, pet)的元组
-            ct_images, pet_images = batch
-            ct_images = ct_images.to(device)
-            pet_images = pet_images.to(device)
+#         for batch in pbar:
+#             # 假设batch是(ct, pet)的元组
+#             ct_images, pet_images = batch
+#             ct_images = ct_images.to(device)
+#             pet_images = pet_images.to(device)
             
-            loss = diffusion.train_step(ct_images, pet_images, optimizer)
-            train_losses.append(loss)
+#             loss = diffusion.train_step(ct_images, pet_images, optimizer)
+#             train_losses.append(loss)
             
-            pbar.set_postfix({'loss': f'{loss:.4f}'})
+#             pbar.set_postfix({'loss': f'{loss:.4f}'})
         
-        avg_train_loss = np.mean(train_losses)
+#         avg_train_loss = np.mean(train_losses)
         
-        # 验证
-        if val_loader is not None:
-            val_losses = []
-            diffusion.model.eval()
+#         # 验证
+#         if val_loader is not None:
+#             val_losses = []
+#             diffusion.model.eval()
             
-            with torch.no_grad():
-                for batch in val_loader:
-                    ct_images, pet_images = batch
-                    ct_images = ct_images.to(device)
-                    pet_images = pet_images.to(device)
+#             with torch.no_grad():
+#                 for batch in val_loader:
+#                     ct_images, pet_images = batch
+#                     ct_images = ct_images.to(device)
+#                     pet_images = pet_images.to(device)
                     
-                    batch_size = ct_images.shape[0]
-                    timesteps = torch.randint(
-                        0, diffusion.scheduler.num_train_timesteps, (batch_size,),
-                        device=device
-                    ).long()
+#                     batch_size = ct_images.shape[0]
+#                     timesteps = torch.randint(
+#                         0, diffusion.scheduler.num_train_timesteps, (batch_size,),
+#                         device=device
+#                     ).long()
                     
-                    noise = torch.randn_like(pet_images)
-                    noisy_pet = diffusion.scheduler.add_noise(pet_images, noise, timesteps)
-                    model_input = torch.cat([ct_images, noisy_pet], dim=1)
-                    noise_pred = diffusion.model(model_input, timesteps)
+#                     noise = torch.randn_like(pet_images)
+#                     noisy_pet = diffusion.scheduler.add_noise(pet_images, noise, timesteps)
+#                     model_input = torch.cat([ct_images, noisy_pet], dim=1)
+#                     noise_pred = diffusion.model(model_input, timesteps)
                     
-                    loss = nn.functional.mse_loss(noise_pred, noise)
-                    val_losses.append(loss.item())
+#                     loss = nn.functional.mse_loss(noise_pred, noise)
+#                     val_losses.append(loss.item())
             
-            avg_val_loss = np.mean(val_losses)
-            print(f'Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}')
+#             avg_val_loss = np.mean(val_losses)
+#             print(f'Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}')
             
-            # 保存最佳模型
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
-                diffusion.save(save_dir / 'best_model.pth')
-        else:
-            print(f'Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}')
+#             # 保存最佳模型
+#             if avg_val_loss < best_val_loss:
+#                 best_val_loss = avg_val_loss
+#                 diffusion.save(save_dir / 'best_model.pth')
+#         else:
+#             print(f'Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}')
         
-        # 每10个epoch保存一次
-        if (epoch + 1) % 10 == 0:
-            diffusion.save(save_dir / f'model_epoch_{epoch+1}.pth')
+#         # 每10个epoch保存一次
+#         if (epoch + 1) % 10 == 0:
+#             diffusion.save(save_dir / f'model_epoch_{epoch+1}.pth')
         
-        scheduler.step()
+#         scheduler.step()
     
-    # 保存最终模型
-    diffusion.save(save_dir / 'final_model.pth')
+#     # 保存最终模型
+#     diffusion.save(save_dir / 'final_model.pth')
     
-    return diffusion
+#     return diffusion
 
 
-@torch.no_grad()
-def inference(ct_images, model_path, num_inference_steps=50, device='cuda'):
-    """推理函数"""
-    # 加载模型
-    diffusion = CTtoPETDiffusion(device=device)
-    diffusion.load(model_path)
+# @torch.no_grad()
+# def inference(ct_images, model_path, num_inference_steps=50, device='cuda'):
+#     """推理函数"""
+#     # 加载模型
+#     diffusion = CTtoPETDiffusion(device=device)
+#     diffusion.load(model_path)
     
-    # 确保输入在正确的设备上
-    if not isinstance(ct_images, torch.Tensor):
-        ct_images = torch.from_numpy(ct_images)
-    ct_images = ct_images.to(device)
+#     # 确保输入在正确的设备上
+#     if not isinstance(ct_images, torch.Tensor):
+#         ct_images = torch.from_numpy(ct_images)
+#     ct_images = ct_images.to(device)
     
-    # 如果输入是单个样本，添加batch维度
-    if ct_images.ndim == 4:
-        ct_images = ct_images.unsqueeze(0)
+#     # 如果输入是单个样本，添加batch维度
+#     if ct_images.ndim == 4:
+#         ct_images = ct_images.unsqueeze(0)
     
-    # 生成PET
-    generated_pet = diffusion.generate(ct_images, num_inference_steps=num_inference_steps)
+#     # 生成PET
+#     generated_pet = diffusion.generate(ct_images, num_inference_steps=num_inference_steps)
     
-    return generated_pet.cpu().numpy()
+#     return generated_pet.cpu().numpy()
 

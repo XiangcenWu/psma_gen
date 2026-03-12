@@ -49,6 +49,17 @@ def parse_args():
         default="psma_pt",
         help="Target image key from the H5 loader",
     )
+    parser.add_argument(
+        "--use-fdg-condition",
+        action="store_true",
+        help="Concatenate FDG PET to CT as a two-channel condition",
+    )
+    parser.add_argument(
+        "--fdg-key",
+        type=str,
+        default="fdg_pt",
+        help="FDG PET key used when --use-fdg-condition is enabled",
+    )
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -70,9 +81,25 @@ def parse_args():
 
 
 
-def get_pair(batch, input_key, target_key, device):
+def map_zero_one_to_minus_one_one(image):
+    return image * 2.0 - 1.0
+
+
+def get_pair(
+    batch,
+    input_key,
+    target_key,
+    device,
+    use_fdg_condition=False,
+    fdg_key="fdg_pt",
+):
     condition = batch[input_key].float().to(device)
+    if use_fdg_condition:
+        fdg = batch[fdg_key].float().to(device)
+        condition = torch.cat([condition, fdg], dim=1)
     target = batch[target_key].float().to(device)
+    condition = map_zero_one_to_minus_one_one(condition)
+    target = map_zero_one_to_minus_one_one(target)
     return condition, target
 
 
@@ -103,13 +130,31 @@ def compute_loss(diffusion, condition, target):
     return F.mse_loss(noise_pred, noise)
 
 
-def train_epoch(diffusion, loader, optimizer, input_key, target_key, device, epoch, epochs):
+def train_epoch(
+    diffusion,
+    loader,
+    optimizer,
+    input_key,
+    target_key,
+    device,
+    epoch,
+    epochs,
+    use_fdg_condition=False,
+    fdg_key="fdg_pt",
+):
     diffusion.model.train()
     losses = []
     progress = tqdm(loader, desc=f"Epoch {epoch + 1}/{epochs}", leave=False)
 
     for batch in progress:
-        condition, target = get_pair(batch, input_key, target_key, device)
+        condition, target = get_pair(
+            batch,
+            input_key,
+            target_key,
+            device,
+            use_fdg_condition,
+            fdg_key,
+        )
         optimizer.zero_grad(set_to_none=True)
         loss = compute_loss(diffusion, condition, target)
         loss.backward()
@@ -123,12 +168,27 @@ def train_epoch(diffusion, loader, optimizer, input_key, target_key, device, epo
 
 
 @torch.no_grad()
-def validate_epoch(diffusion, loader, input_key, target_key, device):
+def validate_epoch(
+    diffusion,
+    loader,
+    input_key,
+    target_key,
+    device,
+    use_fdg_condition=False,
+    fdg_key="fdg_pt",
+):
     diffusion.model.eval()
     losses = []
 
     for batch in tqdm(loader, desc="Validating", leave=False):
-        condition, target = get_pair(batch, input_key, target_key, device)
+        condition, target = get_pair(
+            batch,
+            input_key,
+            target_key,
+            device,
+            use_fdg_condition,
+            fdg_key,
+        )
         losses.append(compute_loss(diffusion, condition, target).item())
 
     return float(np.mean(losses))
@@ -158,8 +218,10 @@ def main(args):
     )
 
 
+    condition_channels = 2 if args.use_fdg_condition else 1
     diffusion = CTtoPETDiffusion(
         device=args.device,
+        in_channels=condition_channels + 1,
         num_train_timesteps=args.num_train_timesteps,
     )
     optimizer = torch.optim.AdamW(diffusion.model.parameters(), lr=args.lr)
@@ -167,9 +229,11 @@ def main(args):
         optimizer, T_max=args.epochs
     )
 
-    best_val_loss = float("inf")
 
-    print(f">>> Conditioning: {args.input_key} -> {args.target_key}")
+    condition_desc = args.input_key
+    if args.use_fdg_condition:
+        condition_desc = f"{args.input_key} + {args.fdg_key}"
+    print(f">>> Conditioning: {condition_desc} -> {args.target_key}")
     print(f">>> Train samples: {len(train_list)} | Val samples: {len(val_list)}")
     print(f">>> Model will be saved to: {save_dir}")
 
@@ -183,6 +247,8 @@ def main(args):
             args.device,
             epoch,
             args.epochs,
+            args.use_fdg_condition,
+            args.fdg_key,
         )
 
         scheduler.step()
@@ -192,10 +258,10 @@ def main(args):
         )
         
         # 策略：每 100 个 epoch 保存一个带版本号的模型，并在最后一个 epoch 强制保存
-        if (epoch + 1) % 100 == 0 or epoch == args.epochs - 1:
-            save_path = save_dir / f"model_epoch_{epoch + 1}.pth"
-            diffusion.save(save_path)
-            print(f'>>> Checkpoint saved: {save_path}')
+        # if (epoch + 1) % 100 == 0 or epoch == args.epochs - 1:
+        save_path = save_dir / f"model_epoch_{epoch + 1}.pth"
+        diffusion.save(save_path)
+        print(f'>>> Checkpoint saved: {save_path}')
 
 
 if __name__ == "__main__":
