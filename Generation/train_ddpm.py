@@ -167,33 +167,6 @@ def train_epoch(
     return float(np.mean(losses))
 
 
-@torch.no_grad()
-def validate_epoch(
-    diffusion,
-    loader,
-    input_key,
-    target_key,
-    device,
-    use_fdg_condition=False,
-    fdg_key="fdg_pt",
-):
-    diffusion.model.eval()
-    losses = []
-
-    for batch in tqdm(loader, desc="Validating", leave=False):
-        condition, target = get_pair(
-            batch,
-            input_key,
-            target_key,
-            device,
-            use_fdg_condition,
-            fdg_key,
-        )
-        losses.append(compute_loss(diffusion, condition, target).item())
-
-    return float(np.mean(losses))
-
-
 def main(args):
     if len(args.data_dirs) != len(args.val_counts):
         raise ValueError("--data-dirs and --val-counts must have the same length")
@@ -256,10 +229,13 @@ def main(args):
         print(
             f"Epoch {epoch:03d} | Train Loss = {train_loss:.6f}"
         )
-        
-        # 策略：每 100 个 epoch 保存一个带版本号的模型，并在最后一个 epoch 强制保存
-        # if (epoch + 1) % 100 == 0 or epoch == args.epochs - 1:
-        save_path = save_dir / f"model_.pth"
+
+        if args.use_fdg_condition:
+            save_path = save_dir / f"{args.input_key}_{args.fdg_key}_to_{args.target_key}.pth"
+        else:
+            save_path = save_dir / f"{args.input_key}_to_{args.target_key}.pth"
+
+
         diffusion.save(save_path)
         print(f'>>> Checkpoint saved: {save_path}')
 
