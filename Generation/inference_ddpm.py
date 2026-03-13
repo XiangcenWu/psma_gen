@@ -76,7 +76,7 @@ def parse_args():
     parser.add_argument(
         "--num-inference-steps",
         type=int,
-        default=1000,
+        default=50,
         help="Number of DDPM reverse diffusion steps used at inference time",
     )
     return parser.parse_args()

@@ -95,7 +95,13 @@ class CTtoPETDiffusion:
 
     
     @torch.no_grad()
-    def generate(self, ct_images, num_inference_steps=1000):
+    def generate(
+        self,
+        ct_images,
+        num_inference_steps=1000,
+        show_progress=True,
+        progress_desc="Generating PET",
+    ):
         """从CT生成PET"""
         self.model.eval()
         batch_size = ct_images.shape[0]
@@ -110,16 +116,27 @@ class CTtoPETDiffusion:
         ).long().to(self.device)
         
         # 迭代去噪
-        for t in timesteps:
+        timestep_iter = (
+            tqdm(timesteps, desc=progress_desc, leave=False)
+            if show_progress
+            else timesteps
+        )
+        for t in timestep_iter:
+            t_value = int(t.item()) if isinstance(t, torch.Tensor) else int(t)
             # 准备输入
             model_input = torch.cat([ct_images, sample], dim=1)
-            timestep_batch = torch.full((batch_size,), t, device=self.device).long()
+            timestep_batch = torch.full(
+                (batch_size,),
+                t_value,
+                device=self.device,
+                dtype=torch.long,
+            )
             
             # 预测噪声
             noise_pred = self.model(model_input, timestep_batch)
             
             # 去噪一步
-            sample = self.scheduler.step(noise_pred, t.item(), sample)
+            sample = self.scheduler.step(noise_pred, t_value, sample)
         
         return sample
     
@@ -254,6 +271,8 @@ def run_inference(diffusion, test_loader, args):
         if batch_size != 1:
             raise ValueError(f"Expected test batch size 1, got {batch_size}.")
 
+        sample_name = f"sample_{index:04d}"
+        progress.set_postfix(sample=sample_name)
 
         condition, _ = get_pair(
             batch,
@@ -266,8 +285,11 @@ def run_inference(diffusion, test_loader, args):
         prediction = diffusion.generate(
             condition,
             num_inference_steps=args.num_inference_steps,
+            show_progress=True,
+            progress_desc=sample_name,
         )
         prediction = map_minus_one_one_to_zero_one(prediction).clamp(0.0, 1.0)
+        prediction = torch.clip(prediction, 0.0, 1.0)
 
         target = batch[args.target_key].float()
 
