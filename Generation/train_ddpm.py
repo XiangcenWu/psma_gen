@@ -5,14 +5,12 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn.functional as F
-from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from General.data_loader import ReadH5d, create_data_loader
 from General.dataset_sample import split_multiple_train_test
-from Generation.DDPM_Baseline import CTtoPETDiffusion
+from Generation.DDPM_Baseline import CTtoPETDiffusion, train_epoch
 
 
 DEFAULT_DATA_DIRS = [
@@ -78,93 +76,6 @@ def parse_args():
     )
     return parser.parse_args()
 
-
-
-
-def map_zero_one_to_minus_one_one(image):
-    return image * 2.0 - 1.0
-
-
-def get_pair(
-    batch,
-    input_key,
-    target_key,
-    device,
-    use_fdg_condition=False,
-    fdg_key="fdg_pt",
-):
-    condition = batch[input_key].float().to(device)
-    if use_fdg_condition:
-        fdg = batch[fdg_key].float().to(device)
-        condition = torch.cat([condition, fdg], dim=1)
-    target = batch[target_key].float().to(device)
-    condition = map_zero_one_to_minus_one_one(condition)
-    target = map_zero_one_to_minus_one_one(target)
-    return condition, target
-
-
-def add_noise_3d(diffusion, target, noise, timesteps):
-    view_shape = (timesteps.shape[0],) + (1,) * (target.ndim - 1)
-    alpha_schedule = diffusion.scheduler.sqrt_alphas_cumprod
-    sigma_schedule = diffusion.scheduler.sqrt_one_minus_alphas_cumprod
-    schedule_timesteps = timesteps.to(alpha_schedule.device)
-
-    alpha = alpha_schedule[schedule_timesteps].to(target.device).view(view_shape)
-    sigma = sigma_schedule[schedule_timesteps].to(target.device).view(view_shape)
-    return alpha * target + sigma * noise
-
-
-def compute_loss(diffusion, condition, target):
-    batch_size = target.shape[0]
-    timesteps = torch.randint(
-        0,
-        diffusion.scheduler.num_train_timesteps,
-        (batch_size,),
-        device=target.device,
-        dtype=torch.long,
-    )
-    noise = torch.randn_like(target)
-    noisy_target = add_noise_3d(diffusion, target, noise, timesteps)
-    model_input = torch.cat([condition, noisy_target], dim=1)
-    noise_pred = diffusion.model(model_input, timesteps)
-    return F.mse_loss(noise_pred, noise)
-
-
-def train_epoch(
-    diffusion,
-    loader,
-    optimizer,
-    input_key,
-    target_key,
-    device,
-    epoch,
-    epochs,
-    use_fdg_condition=False,
-    fdg_key="fdg_pt",
-):
-    diffusion.model.train()
-    losses = []
-    progress = tqdm(loader, desc=f"Epoch {epoch + 1}/{epochs}", leave=False)
-
-    for batch in progress:
-        condition, target = get_pair(
-            batch,
-            input_key,
-            target_key,
-            device,
-            use_fdg_condition,
-            fdg_key,
-        )
-        optimizer.zero_grad(set_to_none=True)
-        loss = compute_loss(diffusion, condition, target)
-        loss.backward()
-        optimizer.step()
-
-        loss_value = loss.item()
-        losses.append(loss_value)
-        progress.set_postfix(loss=f"{loss_value:.4f}")
-
-    return float(np.mean(losses))
 
 
 def main(args):

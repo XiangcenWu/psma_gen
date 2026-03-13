@@ -3,33 +3,51 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import torch
-from Registration.mask import sample_labels_to_binary
+from Registration.mask import sample_labels_to_binary # used to convert multi-label masks to binary masks for visualization
 from monai.networks.nets import SwinUNETR
 from General.data_loader import create_data_loader, ReadH5d
 from General.dataset_sample import split_multiple_train_test
-from Registration.training import train_batch, make_identity_grid_m11
+from Registration.training import make_identity_grid_m11
 
 import SimpleITK as sitk
 import argparse
 from tqdm import tqdm
 
 
-def tensor_to_itk(tensor, spacing=None):
-    """
-    tensor: (1, 1, X, Y, Z) 
-    """
-
-    tensor = tensor.cpu()[0, 0]
-
-    array = tensor.numpy().transpose(2, 1, 0)
-    itk_img = sitk.GetImageFromArray(array)
-
-    if spacing is not None:
-        itk_img.SetSpacing(spacing)
+from General.save_itk import tensor_to_itk
 
 
-    return itk_img
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Generate deformation fields using SwinUNETR"
+    )
+
+    parser.add_argument(
+        "--weights_path",
+        type=str,
+        required=True,
+        help="Path to the trained SwinUNETR model weights (.pth)"
+    )
+
+    parser.add_argument(
+        "--result_dir",
+        type=str,
+        required=True,
+        help="Directory to save generated warp results"
+    )
+
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda:0" if torch.cuda.is_available() else "cpu",
+        help="Device to run on (e.g., cuda, cuda:0, cpu)"
+    )
+
+
+
+    args = parser.parse_args()
+    return args
 
 @torch.no_grad()
 def generate_warp(
@@ -39,7 +57,6 @@ def generate_warp(
         result_dir,
         device="cuda:0"
     ):
-#################3 i need to save also the un warped images
 
     
     model.eval()
@@ -171,33 +188,6 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Generate deformation fields using SwinUNETR"
-    )
-
-    parser.add_argument(
-        "--weights_path",
-        type=str,
-        required=True,
-        help="Path to the trained SwinUNETR model weights (.pth)"
-    )
-
-    parser.add_argument(
-        "--result_dir",
-        type=str,
-        required=True,
-        help="Directory to save generated warp results"
-    )
-
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cuda:0" if torch.cuda.is_available() else "cpu",
-        help="Device to run on (e.g., cuda, cuda:0, cpu)"
-    )
 
 
-
-    args = parser.parse_args()
-
-    main(args)
+    main(parse_args())
