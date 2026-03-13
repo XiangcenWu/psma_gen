@@ -39,8 +39,8 @@ class DDPMScheduler:
     
     def add_noise(self, original, noise, timesteps):
         """添加噪声到原始图像"""
-        sqrt_alpha_prod = self.sqrt_alphas_cumprod[timesteps].view(-1, 1)
-        sqrt_one_minus_alpha_prod = self.sqrt_one_minus_alphas_cumprod[timesteps].view(-1, 1)
+        sqrt_alpha_prod = self.sqrt_alphas_cumprod[timesteps].view(-1, 1, 1, 1, 1)
+        sqrt_one_minus_alpha_prod = self.sqrt_one_minus_alphas_cumprod[timesteps].view(-1, 1, 1, 1, 1)
         
         noisy = sqrt_alpha_prod.to(original.device) * original + \
                 sqrt_one_minus_alpha_prod.to(original.device) * noise
