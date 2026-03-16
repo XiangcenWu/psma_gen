@@ -263,18 +263,15 @@ def train_epoch(
 
 @torch.no_grad()
 def run_inference(diffusion, test_loader, args):
-
-
     progress = tqdm(enumerate(test_loader), total=len(test_loader), desc="DDPM inference")
-    for index, batch in progress:
+
+    global_sample_idx = 0
+
+    for batch_idx, batch in progress:
         batch_size = batch[args.target_key].shape[0]
-        if batch_size != 1:
-            raise ValueError(f"Expected test batch size 1, got {batch_size}.")
+        progress.set_postfix(batch=batch_idx, batch_size=batch_size)
 
-        sample_name = f"sample_{index:04d}"
-        progress.set_postfix(sample=sample_name)
-
-        condition, _ = get_pair(
+        condition, target = get_pair(
             batch,
             args.input_key,
             args.target_key,
@@ -282,20 +279,38 @@ def run_inference(diffusion, test_loader, args):
             args.use_fdg_condition,
             args.fdg_key,
         )
+
         prediction = diffusion.generate(
             condition,
             num_inference_steps=args.num_inference_steps,
             show_progress=True,
-            progress_desc=sample_name,
+            progress_desc=f"batch_{batch_idx:04d}",
         )
-        prediction = map_minus_one_one_to_zero_one(prediction).clamp(0.0, 1.0)
-        prediction = torch.clip(prediction, 0.0, 1.0)
+        prediction = map_minus_one_one_to_zero_one(prediction)
+        print("generated sample min/max:", prediction.min().item(), prediction.max().item())
 
-        target = batch[args.target_key].float()
+        target = map_minus_one_one_to_zero_one(target)
 
 
-        case_dir = os.path.join(args.output_dir, f"sample_{index:04d}")
-        os.makedirs(case_dir, exist_ok=True)
+        for i in range(batch_size):
+            sample_name = f"sample_{global_sample_idx:04d}"
+            progress.set_postfix(sample=sample_name)
 
-        sitk.WriteImage(tensor_to_itk(prediction), os.path.join(case_dir, 'psma_prediction.nii.gz'))
-        sitk.WriteImage(tensor_to_itk(target), os.path.join(case_dir, 'psma_gt.nii.gz'))
+            case_dir = os.path.join(args.output_dir, sample_name)
+            os.makedirs(case_dir, exist_ok=True)
+
+            # prediction[i]: (1, X, Y, Z)
+            # unsqueeze(0) 后: (1, 1, X, Y, Z)
+            pred_i = prediction[i].unsqueeze(0)
+            target_i = target[i].unsqueeze(0)
+
+            sitk.WriteImage(
+                tensor_to_itk(pred_i),
+                os.path.join(case_dir, "psma_prediction.nii.gz"),
+            )
+            sitk.WriteImage(
+                tensor_to_itk(target_i),
+                os.path.join(case_dir, "psma_gt.nii.gz"),
+            )
+
+            global_sample_idx += 1

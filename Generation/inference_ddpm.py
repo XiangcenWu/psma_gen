@@ -79,6 +79,12 @@ def parse_args():
         default=50,
         help="Number of DDPM reverse diffusion steps used at inference time",
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=4,
+        help="Batch size for inference (default: 4, set to 1 if out-of-memory)",
+    )
     return parser.parse_args()
 
 
@@ -104,7 +110,7 @@ def main(args):
     test_loader = create_data_loader(
         test_list,
         transform,
-        batch_size=1,
+        batch_size=args.batch_size,
         shuffle=False,
     )
 
