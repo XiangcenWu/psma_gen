@@ -22,5 +22,5 @@ python Generation/inference_ddpm.py \
     --checkpoint-path /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt/psma_ct_to_psma_pt.pth \
     --output-dir ~/results/generation_ddpm/psma_ct_to_psma_pt \
     --device cuda:0 \
-    --num-inference-steps 1000 \ 
+    --num-inference-steps 1000 \
     --batch-size 4
