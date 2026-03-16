@@ -22,5 +22,6 @@ python Generation/inference_ddpm.py \
     --use-fdg-condition \
     --fdg-key fdg_pt \
     --checkpoint-path /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt/psma_ct_fdg_pt_to_psma_pt.pth \
-    --output-dir /data1/xiangcen/results/generation_ddpm/psma_ct_fdg_pt_to_psma_pt \
-    --device cuda:0
+    --output-dir ~/results/generation_ddpm/psma_ct_fdg_pt_to_psma_pt \
+    --device cuda:0 \
+    --num-inference-steps 1000

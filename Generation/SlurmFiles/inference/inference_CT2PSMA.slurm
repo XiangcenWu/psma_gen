@@ -20,5 +20,6 @@ python Generation/inference_ddpm.py \
     --input-key psma_ct \
     --target-key psma_pt \
     --checkpoint-path /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt/psma_ct_to_psma_pt.pth \
-    --output-dir /data1/xiangcen/results/generation_ddpm/psma_ct_to_psma_pt \
-    --device cuda:0
+    --output-dir ~/results/generation_ddpm/psma_ct_to_psma_pt \
+    --device cuda:0 \
+    --num-inference-steps 1000
