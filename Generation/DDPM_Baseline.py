@@ -12,6 +12,10 @@ import torch.nn.functional as F
 
 import SimpleITK as sitk
 from General.save_itk import tensor_to_itk
+from Generation.utils import (
+    get_pair,
+    map_minus_one_one_to_zero_one,
+)
 
 class DDPMScheduler:
     """DDPM噪声调度器"""
@@ -169,33 +173,6 @@ class CTtoPETDiffusion:
 
         self.model.load_state_dict(state_dict)
         print(f"Model loaded from {path}")
-
-
-def map_zero_one_to_minus_one_one(image):
-    return image * 2.0 - 1.0
-
-def map_minus_one_one_to_zero_one(image):
-    return (image + 1.0) / 2.0
-    
-    
-
-def get_pair(
-    batch,
-    input_key,
-    target_key,
-    device,
-    use_fdg_condition=False,
-    fdg_key="fdg_pt",
-):
-    condition = batch[input_key].float().to(device)
-    if use_fdg_condition:
-        fdg = batch[fdg_key].float().to(device)
-        condition = torch.cat([condition, fdg], dim=1)
-    target = batch[target_key].float().to(device)
-    condition = map_zero_one_to_minus_one_one(condition)
-    target = map_zero_one_to_minus_one_one(target)
-    return condition, target
-
 
 def add_noise_3d(diffusion, target, noise, timesteps):
     view_shape = (timesteps.shape[0],) + (1,) * (target.ndim - 1)
