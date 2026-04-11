@@ -147,8 +147,8 @@ def main(args):
             save_path = save_dir / f"{args.input_key}_to_{args.target_key}.pth"
 
 
-        diffusion.save(save_path)
-        print(f'>>> Checkpoint saved: {save_path}')
+    diffusion.save(save_path)
+    print(f'>>> Checkpoint saved: {save_path}')
 
 
 if __name__ == "__main__":

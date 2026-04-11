@@ -3,3 +3,5 @@ log*
 notes.md
 .vscode
 .idea
+*.err
+*.out
