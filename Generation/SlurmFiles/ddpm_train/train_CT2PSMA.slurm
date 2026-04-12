@@ -19,8 +19,8 @@ python Generation/train_ddpm.py \
     --val-counts 40 40 \
     --input-key psma_ct \
     --target-key psma_pt \
-    --epochs 1000 \
-    --batch-size 1 \
+    --epochs 500 \
+    --batch-size 8 \
     --lr 1e-4 \
     --save-dir /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt \
     --device cuda:0
