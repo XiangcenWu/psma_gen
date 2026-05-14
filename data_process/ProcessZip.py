@@ -64,7 +64,7 @@ def process_zip_files(pressed_dir, output_dir):
             # set the patient's output dir
             patient_output_dir = os.path.join(output_dir, patient)
             if not os.path.isdir(patient_output_dir):
-                os.mkdir(patient_output_dir)
+                os.makedirs(patient_output_dir, exist_ok=True)
 
             # generate nii files
             separate_dicom_modalities(psma_dir, patient_output_dir, 'psma')

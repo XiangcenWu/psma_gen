@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 
 
-BASE_DIR = Path("/results/generation_ddpm/psma_ct_to_psma_pt")
+BASE_DIR = Path("/home/xcwu/results/generation_ddpm/psma_ct_fdg_pt_to_psma_pt")
 GT_NAME = "psma_gt.nii.gz"
 PRED_NAME = "psma_prediction.nii.gz"
 
