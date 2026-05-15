@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from General.data_loader import ReadH5d, create_data_loader
 from General.dataset_sample import split_multiple_train_test
+from General.segments import SEGMENT_INDEX
 from llm_Registration.modernbert_registration_adapter import ModernBERTSwinUNETRRegistrationModel
 from Registration.training import make_identity_grid_m11, train_batch_llm
 
@@ -16,6 +17,23 @@ from Registration.training import make_identity_grid_m11, train_batch_llm
 SPATIAL_SIZE = (64, 64, 192)
 IMAGE_KEYS = ("fdg_ct", "fdg_pt", "psma_ct", "psma_pt")
 MASK_KEYS = ("fdg_mask", "psma_mask")
+DEBUG_PROMPT_REGION_GROUPS = (
+    ("urinary_bladder", "prostate"),
+    ("brain", "skull"),
+    ("kidney_right", "kidney_left"),
+    ("liver", "stomach", "pancreas"),
+    ("heart", "aorta"),
+    ("sacrum", "vertebrae_L5", "vertebrae_L4"),
+)
+
+
+def build_prompt_pairs(region_groups: tuple[tuple[str, ...], ...]) -> list[tuple[str, list[int]]]:
+    prompt_pairs = []
+    for region_group in region_groups:
+        prompt = ", ".join(region_group)
+        labels = [SEGMENT_INDEX[region] for region in region_group]
+        prompt_pairs.append((prompt, labels))
+    return prompt_pairs
 
 
 def ensure_parent_dir(file_path: str) -> None:
@@ -59,11 +77,16 @@ def main(args: argparse.Namespace) -> None:
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     identity_grid = make_identity_grid_m11(SPATIAL_SIZE, device=device)
+    fixed_prompt_pairs = build_prompt_pairs(DEBUG_PROMPT_REGION_GROUPS) if args.debug_prompts else None
 
     print(f">>> Spatial size = {SPATIAL_SIZE}")
     print(f">>> Max prompt organs = {args.max_prompt_organs}")
     print(f">>> Hugging Face model dir = {args.hf_model_dir}")
-    print(f">>> Log loss in FDG masks = {args.log_loss_in_fdg_masks}")
+    print(f">>> Log loss in prompt masks = {args.log_loss_in_fdg_masks}")
+    print(f">>> Debug prompts = {args.debug_prompts}")
+    if fixed_prompt_pairs:
+        for prompt, labels in fixed_prompt_pairs:
+            print(f">>> Fixed prompt: {prompt} | labels: {labels}")
     if args.save_path:
         print(f">>> Model will be saved to: {args.save_path}")
         ensure_parent_dir(args.save_path)
@@ -78,6 +101,7 @@ def main(args: argparse.Namespace) -> None:
             device=device,
             zero_ddf=True,  # zero out DDF for the first few epochs to warm up the model
             log_loss_in_fdg_masks=args.log_loss_in_fdg_masks,
+            fixed_prompt_pairs=fixed_prompt_pairs,
         )
         print(f"Epoch {epoch:03d} | Loss = {loss_batch:.6f}")
 
@@ -90,6 +114,7 @@ def main(args: argparse.Namespace) -> None:
             max_prompt_organs=args.max_prompt_organs,
             device=device,
             log_loss_in_fdg_masks=args.log_loss_in_fdg_masks,
+            fixed_prompt_pairs=fixed_prompt_pairs,
         )
         print(f"Epoch {epoch:03d} | Loss = {loss_batch:.6f}")
         if args.save_path:
@@ -162,7 +187,13 @@ def parse_args() -> argparse.Namespace:
         "--log_loss_in_fdg_masks",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Compute log loss only inside the prompt-selected FDG mask union.",
+        help="Compute log loss only inside the prompt-selected FDG/PSMA mask union.",
+    )
+    parser.add_argument(
+        "--debug_prompts",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Use fixed debug prompt/label pairs instead of random prompts.",
     )
     return parser.parse_args()
 

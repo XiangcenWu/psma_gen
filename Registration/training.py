@@ -162,6 +162,7 @@ def train_batch_llm(
     device="cuda:0",
     zero_ddf = False,
     log_loss_in_fdg_masks=True,
+    fixed_prompt_pairs=None,
 ):
     model.train()
     identity_grid = identity_grid.to(device)
@@ -183,10 +184,14 @@ def train_batch_llm(
         psma_mask = batch["psma_mask"].to(device)
 
         
-        prompt_pairs = [
-            read_basic_prompt(organs=torch.randint(1, max_prompt_organs + 1, (1,)).item())
-            for _ in range(fdg_pt.shape[0])
-        ]
+        if fixed_prompt_pairs:
+            prompt_indices = torch.randint(0, len(fixed_prompt_pairs), (fdg_pt.shape[0],)).tolist()
+            prompt_pairs = [fixed_prompt_pairs[idx] for idx in prompt_indices]
+        else:
+            prompt_pairs = [
+                read_basic_prompt(organs=torch.randint(1, max_prompt_organs + 1, (1,)).item())
+                for _ in range(fdg_pt.shape[0])
+            ]
         prompts = [prompt for prompt, _ in prompt_pairs]
         labels_from_prompts = [labels for _, labels in prompt_pairs]
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=train_job
+#SBATCH --job-name=train_debug_prompts
 #SBATCH --partition=gpu
 #SBATCH --nodelist=gpu02
 #SBATCH --nodes=1
@@ -7,8 +7,8 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
-#SBATCH --output=log_%A_%a.out
-#SBATCH --error=log_%A_%a.err
+#SBATCH --output=debug_prompts_log_%A_%a.out
+#SBATCH --error=debug_prompts_log_%A_%a.err
 
 
 # ---------------- environment ----------------
@@ -35,4 +35,5 @@ python llm_Registration/toy_example.py \
     --max_prompt_organs 5 \
     --lr 1e-5 \
     --device cuda:0 \
-    --save_path /data2/xiangcen/llm_regsitration_model/toy_log.ptm
+    --save_path /data2/xiangcen/llm_regsitration_model/toy_debug_prompts_log.ptm \
+    --debug_prompts
