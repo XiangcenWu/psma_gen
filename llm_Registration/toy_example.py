@@ -1,0 +1,107 @@
+import argparse
+import os
+import sys
+
+import torch
+from monai.transforms import Compose, Resized
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from General.data_loader import ReadH5d, create_data_loader
+from General.dataset_sample import split_multiple_train_test
+from llm_Registration.modernbert_registration_adapter import ModernBERTSwinUNETRRegistrationModel
+from Registration.training import make_identity_grid_m11, train_batch_llm
+
+
+SPATIAL_SIZE = (64, 64, 192)
+IMAGE_KEYS = ("fdg_ct", "fdg_pt", "psma_ct", "psma_pt")
+MASK_KEYS = ("fdg_mask", "psma_mask")
+
+
+def main(args):
+    device = args.device
+
+    model = ModernBERTSwinUNETRRegistrationModel(
+        model_dir=args.model_dir,
+        spatial_size=SPATIAL_SIZE,
+        image_channels=4,
+        freeze_text_encoder=True,
+    ).to(device)
+
+    train_transform = Compose(
+        [
+            ReadH5d(),
+            Resized(
+                keys=IMAGE_KEYS + MASK_KEYS,
+                spatial_size=SPATIAL_SIZE,
+                mode=("trilinear", "trilinear", "trilinear", "trilinear", "nearest", "nearest"),
+                align_corners=(False, False, False, False, None, None),
+            ),
+        ]
+    )
+
+    train_list, test_list = split_multiple_train_test(
+        args.data_dirs,
+        args.num_validations,
+    )
+
+    train_loader = create_data_loader(
+        train_list,
+        train_transform,
+        batch_size=args.batch_size,
+    )
+    print(test_list[:3])
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    identity_grid = make_identity_grid_m11(SPATIAL_SIZE, device=device)
+
+    print(f">>> Spatial size = {SPATIAL_SIZE}")
+    print(f">>> Smoothness lambda = {args.smoothness}")
+
+    for epoch in range(args.epochs):
+        loss_batch = train_batch_llm(
+            model,
+            train_loader,
+            optimizer,
+            identity_grid,
+            max_prompt_organs=args.max_prompt_organs,
+            device=device,
+        )
+        print(f"Epoch {epoch:03d} | Loss = {loss_batch:.6f}")
+
+    if args.save_path:
+        torch.save(model.state_dict(), args.save_path)
+        print(f"model saved at {args.save_path}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Toy 3D Registration Training")
+    parser.add_argument(
+        "--data_dirs",
+        nargs="+",
+        default=[
+            "/data2/xiangcen/data/pet_gen/processed/batch1_h5_v2",
+            "/data2/xiangcen/data/pet_gen/processed/batch2_h5_v2",
+        ],
+        help="One or more H5 data directories.",
+    )
+    parser.add_argument(
+        "--num_validations",
+        nargs="+",
+        type=int,
+        default=[40, 40],
+        help="Validation count for each data directory.",
+    )
+    parser.add_argument("--batch_size", type=int, default=2)
+    parser.add_argument("--smoothness", type=float, default=8000)
+    parser.add_argument("--epochs", type=int, default=350)
+    parser.add_argument("--max_prompt_organs", type=int, default=5)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--model_dir", type=str, required=True)
+    parser.add_argument("--save_path", type=str, default="")
+    parser.add_argument("--ct_smoothness", action="store_true")
+    parser.add_argument("--ct_smoothness_margin", type=float, default=3000.0)
+    parser.add_argument("--ct_smoothness_gamma", type=float, default=1.0)
+
+    main(parser.parse_args())

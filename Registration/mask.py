@@ -1,4 +1,5 @@
 import torch
+from collections.abc import Sequence
 
 
 def sample_labels_to_binary(mask):
@@ -71,10 +72,86 @@ def sample_shared_binary_masks(
     return moving_bin.to(device), fixed_bin.to(device)
 
 
+def labels_to_binary_masks(
+        mask: torch.Tensor,
+        labels_from_prompts: Sequence[Sequence[int]],
+        dtype: torch.dtype = torch.float32,
+    ) -> torch.Tensor:
+    """
+    Convert prompt-selected labels into a multi-channel binary mask tensor.
+
+    Args:
+        mask: Tensor of shape (B, 1, H, W, D) or (B, H, W, D).
+        labels_from_prompts: List of length B. Each item contains the labels
+            sampled for that batch item.
+        dtype: Output tensor dtype.
+
+    Returns:
+        Tensor of shape (B, K, H, W, D), where K is the maximum number of
+        labels in the batch. Items with fewer than K labels are zero-padded.
+    """
+    if mask.dim() == 5:
+        if mask.shape[1] != 1:
+            raise ValueError("mask channel dimension must be 1 when mask is 5D.")
+        mask = mask.squeeze(1)
+    elif mask.dim() != 4:
+        raise ValueError("mask must have shape (B, 1, H, W, D) or (B, H, W, D).")
+
+    batch_size = mask.shape[0]
+    if len(labels_from_prompts) != batch_size:
+        raise ValueError("labels_from_prompts length must match mask batch size.")
+
+    max_labels = max((len(labels) for labels in labels_from_prompts), default=0)
+    if max_labels < 1:
+        raise ValueError("labels_from_prompts must contain at least one label.")
+
+    binary_masks = torch.zeros(
+        (batch_size, max_labels, *mask.shape[1:]),
+        device=mask.device,
+        dtype=dtype,
+    )
+
+    for batch_idx, labels in enumerate(labels_from_prompts):
+        for label_idx, label in enumerate(labels):
+            binary_masks[batch_idx, label_idx] = (mask[batch_idx] == label).to(dtype)
+
+    return binary_masks
+
+
+def prompt_labels_to_binary_masks(
+        moving_mask: torch.Tensor,
+        fixed_mask: torch.Tensor,
+        labels_from_prompts: Sequence[Sequence[int]],
+        dtype: torch.dtype = torch.float32,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Convert prompt-selected labels into moving/fixed multi-channel masks.
+
+    Returns:
+        moving_bin: (B, K, H, W, D)
+        fixed_bin:  (B, K, H, W, D)
+    """
+    if moving_mask.shape != fixed_mask.shape:
+        raise ValueError("moving_mask and fixed_mask must have the same shape.")
+
+    moving_bin = labels_to_binary_masks(
+        mask=moving_mask,
+        labels_from_prompts=labels_from_prompts,
+        dtype=dtype,
+    )
+    fixed_bin = labels_to_binary_masks(
+        mask=fixed_mask,
+        labels_from_prompts=labels_from_prompts,
+        dtype=dtype,
+    )
+
+    return moving_bin, fixed_bin
+
+
 if __name__ == '__main__':
 
-    mask = torch.randint(0, 128, (128, 128 , 128))
-    binary_mask, chosen = sample_labels_to_binary(mask, num_samples=5)
+    mask = torch.randint(0, 8, (2, 1, 16, 16, 16))
+    binary_mask = labels_to_binary_masks(mask, labels_from_prompts=[[1, 2, 3], [4, 5, 6]])
 
-    print("Chosen labels:", chosen)
+    print("Binary mask shape:", binary_mask.shape)
     print("Binary mask unique values:", torch.unique(binary_mask))

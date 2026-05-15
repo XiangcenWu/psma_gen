@@ -4,8 +4,13 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from Registration.mask import sample_labels_to_binary, sample_shared_binary_masks
+from Registration.mask import (
+    prompt_labels_to_binary_masks,
+    sample_labels_to_binary,
+    sample_shared_binary_masks,
+)
 from Registration.smoothness_losses import l2_gradient
+from llm_Registration.prompt.read_basic_prompt import read_basic_prompt
 
 from monai.losses import DiceLoss
 
@@ -146,3 +151,78 @@ def get_ct_lambda(ct_img, margin, smoothness, gamma):
     _min, _max = smoothness-margin, smoothness+margin
     return _min + ct_img * (_max - _min)
 
+
+
+def train_batch_llm(
+    model,
+    loader,
+    optimizer,
+    identity_grid,
+    max_prompt_organs=5,
+    device="cuda:0",
+):
+    model.train()
+    identity_grid = identity_grid.to(device)
+
+    step = 0.0
+    loss_a = 0.0
+
+    for batch in loader:
+        # data loading
+        fdg_ct = batch["fdg_ct"].to(device)
+        psma_ct = batch["psma_ct"].to(device)
+
+        fdg_pt = batch["fdg_pt"].to(device)
+        fdg_mask = batch["fdg_mask"].to(device)
+
+        psma_pt = batch["psma_pt"].to(device)
+        psma_mask = batch["psma_mask"].to(device)
+
+        
+        prompt_pairs = [
+            read_basic_prompt(organs=torch.randint(1, max_prompt_organs + 1, (1,)).item())
+            for _ in range(fdg_pt.shape[0])
+        ]
+        prompts = [prompt for prompt, _ in prompt_pairs]
+        labels_from_prompts = [labels for _, labels in prompt_pairs]
+
+        # input of the model
+        moving_input = torch.cat([fdg_pt, fdg_ct], dim=1)
+        fixed_input = torch.cat([psma_pt, psma_ct], dim=1)
+
+        # generate ddf from model
+        model_outputs = model(
+            moving=moving_input,
+            fixed=fixed_input,
+            texts=prompts,
+        )
+        ddf = model_outputs["ddf"]
+        ddf = torch.tanh(ddf)
+        grid = identity_grid + ddf
+        grid = grid.permute(0, 2, 3, 4, 1)
+
+
+        # later
+        spatial_regularization_map = model_outputs["spatial_regularization_map"]
+        
+        # get smoothness loss
+        smoothness_loss = l2_gradient(ddf, spatial_regularization_map)
+        # get masks from labels_from_prompts
+        fdg_masks, psma_masks = prompt_labels_to_binary_masks(
+            moving_mask = fdg_mask,
+            fixed_mask=psma_mask,
+            labels_from_prompts=labels_from_prompts,
+        )
+        # warp masks from labels_from_prompts
+        warped_moving_masks = torch.nn.functional.grid_sample(fdg_masks, grid)
+        # calculate the final loss
+        loss = loss_function_dice(psma_masks, warped_moving_masks) + smoothness_loss
+
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+        loss_a += loss.item()
+        step += 1.0
+
+    return loss_a / step
