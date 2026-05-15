@@ -182,7 +182,9 @@ def build_adapter(
 
 
 if __name__ == "__main__":
-    adapter = ModernBERTRegistrationAdapter(model_dir="/data2/xiangcen/hf_models")
+    adapter = ModernBERTRegistrationAdapter(model_dir="/data2/xiangcen/hf_models").to('cuda:0')
     output = adapter("whole-body PSMA/FDG registration with liver and kidney focus")
+    import time
+    time.sleep(20)
     for name, value in output.items():
         print(name, tuple(value.shape), value.dtype)
