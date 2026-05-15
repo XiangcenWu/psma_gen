@@ -18,11 +18,16 @@ IMAGE_KEYS = ("fdg_ct", "fdg_pt", "psma_ct", "psma_pt")
 MASK_KEYS = ("fdg_mask", "psma_mask")
 
 
-def main(args):
+def ensure_parent_dir(file_path: str) -> None:
+    parent_dir = os.path.dirname(os.path.abspath(file_path))
+    os.makedirs(parent_dir, exist_ok=True)
+
+
+def main(args: argparse.Namespace) -> None:
     device = args.device
 
     model = ModernBERTSwinUNETRRegistrationModel(
-        model_dir=args.model_dir,
+        model_dir=args.hf_model_dir,
         spatial_size=SPATIAL_SIZE,
         image_channels=4,
         freeze_text_encoder=True,
@@ -56,7 +61,11 @@ def main(args):
     identity_grid = make_identity_grid_m11(SPATIAL_SIZE, device=device)
 
     print(f">>> Spatial size = {SPATIAL_SIZE}")
-    print(f">>> Smoothness lambda = {args.smoothness}")
+    print(f">>> Max prompt organs = {args.max_prompt_organs}")
+    print(f">>> Hugging Face model dir = {args.hf_model_dir}")
+    if args.save_path:
+        print(f">>> Model will be saved to: {args.save_path}")
+        ensure_parent_dir(args.save_path)
 
     for epoch in range(args.epochs):
         loss_batch = train_batch_llm(
@@ -74,8 +83,8 @@ def main(args):
         print(f"model saved at {args.save_path}")
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Toy 3D Registration Training")
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Toy text-guided 3D registration training")
     parser.add_argument(
         "--data_dirs",
         nargs="+",
@@ -92,16 +101,50 @@ if __name__ == "__main__":
         default=[40, 40],
         help="Validation count for each data directory.",
     )
-    parser.add_argument("--batch_size", type=int, default=2)
-    parser.add_argument("--smoothness", type=float, default=8000)
-    parser.add_argument("--epochs", type=int, default=350)
-    parser.add_argument("--max_prompt_organs", type=int, default=5)
-    parser.add_argument("--lr", type=float, default=1e-5)
-    parser.add_argument("--device", type=str, default="cuda:0")
-    parser.add_argument("--model_dir", type=str, required=True)
-    parser.add_argument("--save_path", type=str, default="")
-    parser.add_argument("--ct_smoothness", action="store_true")
-    parser.add_argument("--ct_smoothness_margin", type=float, default=3000.0)
-    parser.add_argument("--ct_smoothness_gamma", type=float, default=1.0)
+    parser.add_argument(
+        "--hf_model_dir",
+        type=str,
+        required=True,
+        help="Local directory containing the ModernBERT tokenizer and model weights.",
+    )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default="",
+        help="Optional path for saving the trained model state_dict.",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=2,
+        help="Training batch size.",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=350,
+        help="Number of training epochs.",
+    )
+    parser.add_argument(
+        "--max_prompt_organs",
+        type=int,
+        default=5,
+        help="Maximum number of organ labels sampled into each prompt.",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-5,
+        help="Learning rate.",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda:0",
+        help="Training device.",
+    )
+    return parser.parse_args()
 
-    main(parser.parse_args())
+
+if __name__ == "__main__":
+    main(parse_args())
