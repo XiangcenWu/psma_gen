@@ -160,7 +160,8 @@ def train_batch_llm(
     identity_grid,
     max_prompt_organs=5,
     device="cuda:0",
-    zero_ddf = False
+    zero_ddf = False,
+    log_loss_in_fdg_masks=True,
 ):
     model.train()
     identity_grid = identity_grid.to(device)
@@ -211,16 +212,24 @@ def train_batch_llm(
 
             # later
             spatial_regularization_map = model_outputs["spatial_regularization_map"]
-            log_loss = 0.8 * (-torch.log(spatial_regularization_map.clamp(min=1e-4, max=1.0))).mean() / 9.210340371976184
-            # get smoothness loss
-            spatial_regularization_map = spatial_regularization_map[:, :, 1:-1, 1:-1, 1:-1]
-            smoothness_loss = 8000*l2_gradient(ddf, spatial_regularization_map)
             # get masks from labels_from_prompts
             fdg_masks, psma_masks = prompt_labels_to_binary_masks(
                 moving_mask = fdg_mask,
                 fixed_mask=psma_mask,
                 labels_from_prompts=labels_from_prompts,
             )
+            log_loss_map = -torch.log(spatial_regularization_map.clamp(min=1e-4, max=1.0))
+            if log_loss_in_fdg_masks:
+                fdg_log_mask = ((fdg_masks > 0).any(dim=1, keepdim=True) | (psma_masks > 0).any(dim=1, keepdim=True)).to(
+                    dtype=spatial_regularization_map.dtype,
+                    device=spatial_regularization_map.device,
+                )
+                log_loss = 0.8 * (log_loss_map * fdg_log_mask).sum() / fdg_log_mask.sum().clamp_min(1.0) / 9.210340371976184
+            else:
+                log_loss = 0.8 * log_loss_map.mean() / 9.210340371976184
+            # get smoothness loss
+            spatial_regularization_map = spatial_regularization_map[:, :, 1:-1, 1:-1, 1:-1]
+            smoothness_loss = 8000*l2_gradient(ddf, spatial_regularization_map)
             # warp masks from labels_from_prompts
             warped_moving_masks = torch.nn.functional.grid_sample(fdg_masks, grid)
             # calculate the final loss

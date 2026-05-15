@@ -63,6 +63,7 @@ def main(args: argparse.Namespace) -> None:
     print(f">>> Spatial size = {SPATIAL_SIZE}")
     print(f">>> Max prompt organs = {args.max_prompt_organs}")
     print(f">>> Hugging Face model dir = {args.hf_model_dir}")
+    print(f">>> Log loss in FDG masks = {args.log_loss_in_fdg_masks}")
     if args.save_path:
         print(f">>> Model will be saved to: {args.save_path}")
         ensure_parent_dir(args.save_path)
@@ -76,6 +77,7 @@ def main(args: argparse.Namespace) -> None:
             max_prompt_organs=args.max_prompt_organs,
             device=device,
             zero_ddf=True,  # zero out DDF for the first few epochs to warm up the model
+            log_loss_in_fdg_masks=args.log_loss_in_fdg_masks,
         )
         print(f"Epoch {epoch:03d} | Loss = {loss_batch:.6f}")
 
@@ -87,6 +89,7 @@ def main(args: argparse.Namespace) -> None:
             identity_grid,
             max_prompt_organs=args.max_prompt_organs,
             device=device,
+            log_loss_in_fdg_masks=args.log_loss_in_fdg_masks,
         )
         print(f"Epoch {epoch:03d} | Loss = {loss_batch:.6f}")
         if args.save_path:
@@ -154,6 +157,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="cuda:0",
         help="Training device.",
+    )
+    parser.add_argument(
+        "--log_loss_in_fdg_masks",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Compute log loss only inside the prompt-selected FDG mask union.",
     )
     return parser.parse_args()
 
