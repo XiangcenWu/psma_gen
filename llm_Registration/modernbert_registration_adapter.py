@@ -213,7 +213,7 @@ class ModernBERTRegistrationAdapter(nn.Module):
 
         return {
             "spatial_regularization_map": torch.sigmoid(regularization_logits),
-            "registration_guidance_feature": torch.tanh(guidance_logits),
+            "registration_guidance_feature": torch.sigmoid(guidance_logits),
         }
 
 

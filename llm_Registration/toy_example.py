@@ -66,6 +66,18 @@ def main(args: argparse.Namespace) -> None:
     if args.save_path:
         print(f">>> Model will be saved to: {args.save_path}")
         ensure_parent_dir(args.save_path)
+        
+    for epoch in range(3):
+        loss_batch = train_batch_llm(
+            model,
+            train_loader,
+            optimizer,
+            identity_grid,
+            max_prompt_organs=args.max_prompt_organs,
+            device=device,
+            zero_ddf=True,  # zero out DDF for the first few epochs to warm up the model
+        )
+        print(f"Epoch {epoch:03d} | Loss = {loss_batch:.6f}")
 
     for epoch in range(args.epochs):
         loss_batch = train_batch_llm(
@@ -77,10 +89,10 @@ def main(args: argparse.Namespace) -> None:
             device=device,
         )
         print(f"Epoch {epoch:03d} | Loss = {loss_batch:.6f}")
+        if args.save_path:
+            torch.save(model.state_dict(), args.save_path)
+            print(f"model saved at {args.save_path}")
 
-    if args.save_path:
-        torch.save(model.state_dict(), args.save_path)
-        print(f"model saved at {args.save_path}")
 
 
 def parse_args() -> argparse.Namespace:

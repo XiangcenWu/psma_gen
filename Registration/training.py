@@ -160,12 +160,15 @@ def train_batch_llm(
     identity_grid,
     max_prompt_organs=5,
     device="cuda:0",
+    zero_ddf = False
 ):
     model.train()
     identity_grid = identity_grid.to(device)
 
     step = 0.0
     loss_a = 0.0
+
+    
 
     for batch in loader:
         # data loading
@@ -198,32 +201,36 @@ def train_batch_llm(
         )
         ddf = model_outputs["ddf"]
         ddf = torch.tanh(ddf)
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
+        if zero_ddf:
+            ddf_loss = ddf.pow(2).mean()
+            return 0.
+        else:
+            grid = identity_grid + ddf
+            grid = grid.permute(0, 2, 3, 4, 1)
 
 
-        # later
-        spatial_regularization_map = model_outputs["spatial_regularization_map"]
-        
-        # get smoothness loss
-        spatial_regularization_map = spatial_regularization_map[:, :, 1:-1, 1:-1, 1:-1]
-        smoothness_loss = l2_gradient(ddf, spatial_regularization_map)
-        # get masks from labels_from_prompts
-        fdg_masks, psma_masks = prompt_labels_to_binary_masks(
-            moving_mask = fdg_mask,
-            fixed_mask=psma_mask,
-            labels_from_prompts=labels_from_prompts,
-        )
-        # warp masks from labels_from_prompts
-        warped_moving_masks = torch.nn.functional.grid_sample(fdg_masks, grid)
-        # calculate the final loss
-        loss = loss_function_dice(psma_masks, warped_moving_masks) + smoothness_loss
+            # later
+            spatial_regularization_map = model_outputs["spatial_regularization_map"]
+            log_loss = 0.8 * (-torch.log(spatial_regularization_map.clamp(min=1e-4, max=1.0))).mean() / 9.210340371976184
+            # get smoothness loss
+            spatial_regularization_map = spatial_regularization_map[:, :, 1:-1, 1:-1, 1:-1]
+            smoothness_loss = 8000*l2_gradient(ddf, spatial_regularization_map)
+            # get masks from labels_from_prompts
+            fdg_masks, psma_masks = prompt_labels_to_binary_masks(
+                moving_mask = fdg_mask,
+                fixed_mask=psma_mask,
+                labels_from_prompts=labels_from_prompts,
+            )
+            # warp masks from labels_from_prompts
+            warped_moving_masks = torch.nn.functional.grid_sample(fdg_masks, grid)
+            # calculate the final loss
+            loss = loss_function_dice(psma_masks, warped_moving_masks) + smoothness_loss + log_loss
 
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
-        loss_a += loss.item()
-        step += 1.0
+            loss_a += loss.item()
+            step += 1.0
 
-    return loss_a / step
+        return loss_a / step
