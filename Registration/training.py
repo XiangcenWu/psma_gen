@@ -206,6 +206,7 @@ def train_batch_llm(
         spatial_regularization_map = model_outputs["spatial_regularization_map"]
         
         # get smoothness loss
+        spatial_regularization_map = spatial_regularization_map[:, :, 1:-1, 1:-1, 1:-1]
         smoothness_loss = l2_gradient(ddf, spatial_regularization_map)
         # get masks from labels_from_prompts
         fdg_masks, psma_masks = prompt_labels_to_binary_masks(

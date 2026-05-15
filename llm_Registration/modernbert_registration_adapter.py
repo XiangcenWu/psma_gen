@@ -248,7 +248,6 @@ class ModernBERTSwinUNETRRegistrationModel(nn.Module):
         self.registration_net = SwinUNETR(
             in_channels=image_channels + 1,  # four image channels + one guidance channel
             out_channels=out_channels,
-            img_size=spatial_size,
             depths=depths,
             num_heads=num_heads,
             downsample="mergingv2",
