@@ -118,36 +118,6 @@ def labels_to_binary_masks(
     return binary_masks
 
 
-def prompt_labels_to_binary_masks(
-        moving_mask: torch.Tensor,
-        fixed_mask: torch.Tensor,
-        labels_from_prompts: Sequence[Sequence[int]],
-        dtype: torch.dtype = torch.float32,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Convert prompt-selected labels into moving/fixed multi-channel masks.
-
-    Returns:
-        moving_bin: (B, K, H, W, D)
-        fixed_bin:  (B, K, H, W, D)
-    """
-    if moving_mask.shape != fixed_mask.shape:
-        raise ValueError("moving_mask and fixed_mask must have the same shape.")
-
-    moving_bin = labels_to_binary_masks(
-        mask=moving_mask,
-        labels_from_prompts=labels_from_prompts,
-        dtype=dtype,
-    )
-    fixed_bin = labels_to_binary_masks(
-        mask=fixed_mask,
-        labels_from_prompts=labels_from_prompts,
-        dtype=dtype,
-    )
-
-    return moving_bin, fixed_bin
-
-
 if __name__ == '__main__':
 
     mask = torch.randint(0, 8, (2, 1, 16, 16, 16))
