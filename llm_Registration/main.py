@@ -397,7 +397,6 @@ def ask_qwen_for_registration_decision(
     registration_json: Dict[str, Any],
     user_request: Optional[str] = None,
     max_organs: int = 20,
-    debug: bool = True,
 ) -> Dict[str, Any]:
     llm_input = build_llm_input(
         registration_json=registration_json,
@@ -439,13 +438,11 @@ def ask_qwen_for_registration_decision(
     new_tokens = output_ids[0][inputs["input_ids"].shape[-1]:]
     answer = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
-    if debug:
-        print("\n========== LLM Input ==========")
-        print(safe_json_dumps(llm_input, indent=2))
-        print("================================\n")
-        print("\n========== LLM Raw Output ==========")
-        print(answer)
-        print("====================================\n")
+
+
+    print("\n========== LLM Raw Output ==========")
+    print(answer)
+    print("====================================\n")
 
     return validate_decision(extract_json(answer))
 
@@ -464,7 +461,6 @@ def summarize_single_case_registration(
         registration_json=registration_json,
         user_request=user_request,
         max_organs=max_organs,
-        debug=debug,
     )
 
     return {
@@ -480,11 +476,6 @@ if __name__ == "__main__":
         description="Run single-case registration inference and summarize it with an LLM."
     )
     parser.add_argument(
-        "patient_path",
-        type=str,
-        help="Path to one patient .h5 file.",
-    )
-    parser.add_argument(
         "--user_request",
         type=str,
         default=None,
@@ -496,18 +487,12 @@ if __name__ == "__main__":
         default=20,
         help="Maximum number of priority organs sent to the LLM.",
     )
-    parser.add_argument(
-        "--no_debug",
-        action="store_true",
-        help="Do not print the compact LLM input and raw LLM output.",
-    )
 
     args = parser.parse_args()
     result = summarize_single_case_registration(
-        patient_path=args.patient_path,
+        patient_path="/data2/xiangcen/data/pet_gen/processed/batch3_h5_v2/patient_0066.h5",
         user_request=args.user_request,
         max_organs=args.max_organs,
-        debug=not args.no_debug,
     )
     print("\n========== Final Registration Summary ==========")
     print(safe_json_dumps(result, indent=2))

@@ -24,7 +24,11 @@ DEFAULT_WEIGHTS_PATH = "/data1/xiangcen/models/registration_v2/ctsmoothness_l450
 DEFAULT_OUTPUT_DIR = "/share/home/xcwu/pet_reg_results_llm/single_case_json"
 DEFAULT_SPATIAL_SIZE = (128, 128, 384)
 DEFAULT_DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-DEFAULT_MASK_NAMES = list(SEGMENT_INDEX.keys())
+EXCLUDED_MASK_NAMES = {"kidney_cyst_left", "kidney_cyst_right"}
+DEFAULT_MASK_NAMES = [
+    name for name in SEGMENT_INDEX.keys()
+    if name not in EXCLUDED_MASK_NAMES
+]
 
 
 def build_registration_model():
@@ -76,32 +80,15 @@ def make_case_json_name(patient_path):
     return f"{source_dir}-{case_id}.json"
 
 
-@torch.no_grad()
-def inference_single_case_json(
-    patient_path,
-    output_dir=DEFAULT_OUTPUT_DIR,
-    weights_path=DEFAULT_WEIGHTS_PATH,
-    masks_names=DEFAULT_MASK_NAMES,
-    device=DEFAULT_DEVICE,
-):
-    os.makedirs(output_dir, exist_ok=True)
-
+def load_single_case_batch(patient_path):
     batch = ReadH5d()(patient_path)
-    batch = {
+    return {
         key: value.unsqueeze(0) if torch.is_tensor(value) else value
         for key, value in batch.items()
     }
 
-    model = build_registration_model()
-    load_model_weights(model, weights_path, device)
-    model.eval()
-    model.to(device)
 
-    identity_grid = make_identity_grid_m11(
-        DEFAULT_SPATIAL_SIZE,
-        device=device,
-    )
-
+def prepare_case_variables(batch, device=DEFAULT_DEVICE):
     fdg_ct = batch["fdg_ct"].to(device)
     fdg_pt = batch["fdg_pt"].to(device)
     fdg_mask = batch["fdg_mask"].to(device)
@@ -113,6 +100,43 @@ def inference_single_case_json(
     psma_spacing = spacing_to_list(batch["psma_spacing"])
 
     spacing = (torch.tensor(fdg_spacing) + torch.tensor(psma_spacing)) / 2
+
+    return {
+        "fdg_ct": fdg_ct,
+        "fdg_pt": fdg_pt,
+        "fdg_mask": fdg_mask,
+        "psma_ct": psma_ct,
+        "psma_pt": psma_pt,
+        "psma_mask": psma_mask,
+        "spacing": spacing,
+    }
+
+
+@torch.no_grad()
+def make_case_json_from_h5(
+    model,
+    batch,
+    patient_path,
+    masks_names=DEFAULT_MASK_NAMES,
+    device=DEFAULT_DEVICE,
+):
+    model.eval()
+    model.to(device)
+
+
+    identity_grid = make_identity_grid_m11(
+        DEFAULT_SPATIAL_SIZE,
+        device=device,
+    )
+
+    case_vars = prepare_case_variables(batch, device=device)
+    fdg_ct = case_vars["fdg_ct"]
+    fdg_pt = case_vars["fdg_pt"]
+    fdg_mask = case_vars["fdg_mask"]
+    psma_ct = case_vars["psma_ct"]
+    psma_pt = case_vars["psma_pt"]
+    psma_mask = case_vars["psma_mask"]
+    spacing = case_vars["spacing"]
 
     model_input = torch.cat([fdg_pt, psma_pt], dim=1)
     ddf = torch.tanh(model(model_input))
@@ -201,14 +225,35 @@ def inference_single_case_json(
         "organs": organ_metrics,
     }
 
-    # output_path = os.path.join(output_dir, make_case_json_name(patient_path))
-    # save_json(case_json, output_path)
     return case_json
+
+
+@torch.no_grad()
+def inference_single_case_json(
+    patient_path,
+    output_dir=DEFAULT_OUTPUT_DIR,
+    weights_path=DEFAULT_WEIGHTS_PATH,
+    masks_names=DEFAULT_MASK_NAMES,
+    device=DEFAULT_DEVICE,
+):
+    os.makedirs(output_dir, exist_ok=True)
+
+    batch = load_single_case_batch(patient_path)
+    model = build_registration_model()
+    load_model_weights(model, weights_path, device)
+
+    return make_case_json_from_h5(
+        model=model,
+        batch=batch,
+        patient_path=patient_path,
+        masks_names=masks_names,
+        device=device,
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run one patient registration inference and save one JSON file."
+        description="Run one patient registration inference and print one JSON object."
     )
     parser.add_argument(
         "patient_path",
