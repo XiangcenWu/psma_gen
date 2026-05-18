@@ -28,6 +28,7 @@ from llm_Registration.inference_single_case import (
 
 MAX_AGENT_STEPS = 3
 TOOL_NAME = "finetune_registration_model_on_roi"
+RESULT_OUTPUT_DIR = os.path.dirname(__file__)
 
 
 AGENT_SYSTEM_PROMPT = """
@@ -124,6 +125,17 @@ def extract_json(text: str) -> Dict[str, Any]:
 
 def safe_json_dumps(obj: Any, indent: int = 2) -> str:
     return json.dumps(obj, indent=indent, ensure_ascii=False)
+
+
+def save_agent_result(result: Dict[str, Any]) -> str:
+    patient_name = os.path.splitext(os.path.basename(result["patient_path"]))[0]
+    output_path = os.path.join(
+        RESULT_OUTPUT_DIR,
+        f"{patient_name}_agent_result.json",
+    )
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2, ensure_ascii=False)
+    return output_path
 
 
 def summarize_organs_for_llm(
@@ -365,6 +377,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     result = run_registration_agent(args.patient_path)
+    output_path = save_agent_result(result)
     print("\n========== Final Agent State ==========")
     print(safe_json_dumps(result, indent=2))
+    print(f"Saved final agent state to: {output_path}")
     print("=======================================\n")
