@@ -10,6 +10,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from General.data_loader import ReadH5d
 from General.segments import SEGMENT_INDEX
+from llm_Registration.config import (
+    DEVICE,
+    MASK_NAMES,
+    REGISTRATION_WEIGHTS_PATH,
+    SINGLE_CASE_OUTPUT_DIR,
+    SPATIAL_SIZE,
+)
 from Registration.inferencing import (
     compute_tre_single,
     dice_metric,
@@ -20,15 +27,12 @@ from Registration.inferencing import (
 from Registration.training import make_identity_grid_m11
 
 
-DEFAULT_WEIGHTS_PATH = "/data1/xiangcen/models/registration_v2/ctsmoothness_l4500_k10_mar3000_gam2.0.ptm"
-DEFAULT_OUTPUT_DIR = "/share/home/xcwu/pet_reg_results_llm/single_case_json"
-DEFAULT_SPATIAL_SIZE = (128, 128, 384)
-DEFAULT_DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-EXCLUDED_MASK_NAMES = {"kidney_cyst_left", "kidney_cyst_right"}
-DEFAULT_MASK_NAMES = [
-    name for name in SEGMENT_INDEX.keys()
-    if name not in EXCLUDED_MASK_NAMES
-]
+DEFAULT_WEIGHTS_PATH = REGISTRATION_WEIGHTS_PATH
+DEFAULT_OUTPUT_DIR = SINGLE_CASE_OUTPUT_DIR
+DEFAULT_SPATIAL_SIZE = SPATIAL_SIZE
+DEFAULT_DEVICE = DEVICE
+DEFAULT_MASK_NAMES = MASK_NAMES
+
 
 
 def build_registration_model():
