@@ -5,12 +5,12 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from Registration.mask import (
-    prompt_labels_to_binary_masks,
+    labels_to_binary_masks,
     sample_labels_to_binary,
     sample_shared_binary_masks,
 )
 from Registration.smoothness_losses import l2_gradient
-from llm_Registration.prompt.read_basic_prompt import read_basic_prompt
+
 
 from monai.losses import DiceLoss
 
