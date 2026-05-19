@@ -22,8 +22,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from Registration.training import make_identity_grid_m11
-
 
 def _init_flow_layer(layer: nn.Conv3d) -> None:
     nn.init.normal_(layer.weight, mean=0.0, std=1e-5)

@@ -31,9 +31,18 @@ def is_spatially_varying_model(model_name):
 def get_baseline_save_path(args):
     mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
     model_tag = args.baseline_model.lower().replace("-", "_")
+    beta_tag = ""
+    if model_tag in SPATIALLY_VARYING_MODELS:
+        beta_tag = (
+            f"_mar{int(args.smoothness_margin)}"
+            f"_beta{args.beta_lambda:g}"
+            f"_a{args.beta_alpha:g}"
+            f"_b{args.beta_beta:g}"
+            f"_{args.beta_prior_mode}"
+        )
     return (
         "/data1/xiangcen/models/registration_v2/"
-        f"{model_tag}_l{int(args.smoothness)}{mask_tag}.ptm"
+        f"{model_tag}_l{int(args.smoothness)}{mask_tag}{beta_tag}.ptm"
     )
 
 
@@ -57,6 +66,7 @@ def train_baseline_batch(
     optimizer,
     identity_grid,
     smoothness_lambda=1000,
+    smoothness_margin=3000,
     beta_lambda=1.0,
     beta_prior_loss=None,
     num_masks=50,
@@ -86,9 +96,22 @@ def train_baseline_batch(
             outputs = model(fdg_pt, psma_pt)
             ddf = outputs["ddf"]
             regularization_map = outputs["regularization_map"]
-            smoothness_loss = smoothness_lambda * spatially_weighted_l2_gradient(
+
+            lambda_min = smoothness_lambda - smoothness_margin
+            lambda_max = smoothness_lambda + smoothness_margin
+            if lambda_min <= 0:
+                raise ValueError(
+                    "smoothness - smoothness_margin must be positive for "
+                    "spatially varying regularization."
+                )
+            regularization_weight_map = (
+                lambda_min
+                + regularization_map * (lambda_max - lambda_min)
+            )
+
+            smoothness_loss = spatially_weighted_l2_gradient(
                 ddf,
-                regularization_map,
+                regularization_weight_map,
             )
             beta_loss = beta_lambda * beta_prior_loss(regularization_map)
         else:
@@ -167,6 +190,7 @@ def main(args):
 
     print(f">>> Baseline model = {args.baseline_model}")
     print(f">>> Smoothness lambda = {args.smoothness}")
+    print(f">>> Smoothness margin = {args.smoothness_margin}")
     print(f">>> Beta lambda = {args.beta_lambda}")
     print(f">>> Beta prior = Beta({args.beta_alpha}, {args.beta_beta}), mode={args.beta_prior_mode}")
     print(f">>> Spatially varying regularization = {spatially_varying_regularization}")
@@ -179,6 +203,7 @@ def main(args):
             optimizer,
             identity_grid,
             smoothness_lambda=args.smoothness,
+            smoothness_margin=args.smoothness_margin,
             beta_lambda=args.beta_lambda,
             beta_prior_loss=beta_prior_loss,
             num_masks=args.num_masks,
@@ -214,6 +239,13 @@ if __name__ == "__main__":
         type=float,
         default=8000,
         help="Smoothness regularization weight (lambda)",
+    )
+
+    parser.add_argument(
+        "--smoothness_margin",
+        type=float,
+        default=3000,
+        help="Margin for SVR regularization weights: [lambda-margin, lambda+margin].",
     )
 
     parser.add_argument(
