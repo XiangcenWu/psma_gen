@@ -32,7 +32,7 @@ TOOL_NAME = "finetune_registration_model_on_roi"
 RESULT_OUTPUT_DIR = os.path.dirname(__file__)
 
 
-AGENT_SYSTEM_PROMPT = f"""
+AGENT_SYSTEM_PROMPT = """
 You are a medical image registration agent.
 
 You will receive a JSON state for one patient. The state contains:
@@ -53,7 +53,7 @@ It requires mask_labels, a list of integer labels from 1 to 128.
 Decision rules:
 1. If the latest result is already acceptable, choose accept_current_model.
 2. If important organs still have low dice_after, high tre_after, or poor improvement, choose finetune_registration_model_on_roi.
-3. Choose at most {MAX_MASK_LABELS_PER_FINETUNE} labels.
+3. Choose at most __MAX_MASK_LABELS_PER_FINETUNE__ labels.
 4. Use only organ names and labels present in selected_organs_for_llm.
 5. Do not invent organ names or labels.
 6. Output exactly one valid JSON object.
@@ -88,7 +88,10 @@ Output format for accepting:
   },
   "reason": "The current metrics are sufficient and no further refinement is needed."
 }
-"""
+""".replace(
+    "__MAX_MASK_LABELS_PER_FINETUNE__",
+    str(MAX_MASK_LABELS_PER_FINETUNE),
+)
 
 
 def load_qwen(model_path: str):
