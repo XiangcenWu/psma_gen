@@ -27,11 +27,12 @@ from llm_Registration.inference_single_case import (
 
 
 MAX_AGENT_STEPS = 3
+MAX_MASK_LABELS_PER_FINETUNE = 10
 TOOL_NAME = "finetune_registration_model_on_roi"
 RESULT_OUTPUT_DIR = os.path.dirname(__file__)
 
 
-AGENT_SYSTEM_PROMPT = """
+AGENT_SYSTEM_PROMPT = f"""
 You are a medical image registration agent.
 
 You will receive a JSON state for one patient. The state contains:
@@ -52,7 +53,7 @@ It requires mask_labels, a list of integer labels from 1 to 128.
 Decision rules:
 1. If the latest result is already acceptable, choose accept_current_model.
 2. If important organs still have low dice_after, high tre_after, or poor improvement, choose finetune_registration_model_on_roi.
-3. Choose at most 10 labels.
+3. Choose at most {MAX_MASK_LABELS_PER_FINETUNE} labels.
 4. Use only organ names and labels present in selected_organs_for_llm.
 5. Do not invent organ names or labels.
 6. Output exactly one valid JSON object.
@@ -230,9 +231,20 @@ def validate_agent_decision(
         ]
         if not mask_labels:
             raise ValueError("Tool action requires non-empty valid mask_labels.")
-        tool_args["mask_labels"] = mask_labels[:3]
+        tool_args["mask_labels"] = mask_labels[:MAX_MASK_LABELS_PER_FINETUNE]
+        valid_label_set = set(tool_args["mask_labels"])
+        valid_target_organs = []
+        for organ in decision["target_organs"]:
+            try:
+                organ_label = int(organ.get("label", -1))
+            except (TypeError, ValueError):
+                continue
+            if organ_label in valid_label_set:
+                valid_target_organs.append(organ)
+        decision["target_organs"] = valid_target_organs
     else:
         tool_args["mask_labels"] = []
+        decision["target_organs"] = []
 
     return decision
 
