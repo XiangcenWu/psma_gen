@@ -16,6 +16,15 @@ from Registration.training import make_identity_grid_m11
 from inferencing import inference_batch
 
 
+DEFAULT_RESULT_DIR = "/share/home/xcwu/pet_reg_results"
+
+
+def make_output_path(weights_path, result_dir=DEFAULT_RESULT_DIR):
+    os.makedirs(result_dir, exist_ok=True)
+    output_name = os.path.splitext(os.path.basename(weights_path))[0] + ".txt"
+    return os.path.join(result_dir, output_name)
+
+
 
 def main(args):
     device = args.device
@@ -52,8 +61,7 @@ def main(args):
 
         for weights_path in weights_paths_list:
             # get the file name
-            path = os.path.splitext(os.path.basename(weights_path))[0] + '.txt'
-            filename = os.path.join('/share/home/xcwu/pet_reg_results', path)
+            filename = make_output_path(weights_path)
             print(f'txt saved at {filename}')
 
             if os.path.exists(filename):
@@ -68,11 +76,15 @@ def main(args):
                 device=args.device
             )
     else:
+        filename = make_output_path(args.weights_path)
+        print(f'txt saved at {filename}')
+
         model.load_state_dict(torch.load(args.weights_path, map_location=device))
         inference_batch(
             model,
             test_loader,
             identity_grid,
+            filename=filename,
             device=args.device
         )
 

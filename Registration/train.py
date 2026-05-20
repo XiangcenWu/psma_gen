@@ -10,20 +10,47 @@ from General.data_loader import create_data_loader, ReadH5d
 
 
 from General.dataset_sample import split_multiple_train_test
+from Registration.baseline_models import build_baseline_model
 from Registration.training import train_batch, make_identity_grid_m11, get_save_path
+
+
+def build_registration_model(model_name):
+    model_name = model_name.lower().replace("-", "_")
+    if model_name in ("swinunetr", "swin_transformer", "swin"):
+        return SwinUNETR(
+            in_channels=2,
+            out_channels=3,
+            depths=(2, 2, 2, 2),
+            num_heads=(3, 6, 12, 24),
+            downsample="mergingv2",
+            use_v2=True,
+        )
+
+    if model_name == "vxm":
+        model_name = "voxelmorph"
+
+    return build_baseline_model(model_name)
+
+
+def get_model_save_path(args):
+    save_path = get_save_path(args)
+    model_name = args.registration_model.lower().replace("-", "_")
+
+    if model_name in ("swinunetr", "swin_transformer", "swin"):
+        return save_path
+
+    if model_name == "vxm":
+        model_name = "voxelmorph"
+
+    save_dir = os.path.dirname(save_path)
+    save_name = os.path.basename(save_path)
+    return os.path.join(save_dir, f"{model_name}_{save_name}")
 
 
 def main(args):
     device = args.device
 
-    model = SwinUNETR(
-        in_channels=2,
-        out_channels=3,
-        depths=(2, 2, 2, 2),
-        num_heads=(3, 6, 12, 24),
-        downsample="mergingv2",
-        use_v2=True,
-    ).to(device)
+    model = build_registration_model(args.registration_model).to(device)
 
     train_transform = ReadH5d()
 
@@ -43,9 +70,10 @@ def main(args):
         (128, 128, 384), device=device
     )
 
-    save_path = get_save_path(args)
+    save_path = get_model_save_path(args)
 
 
+    print(f'>>> Registration model = {args.registration_model}')
     print(f'>>> Smoothness lambda = {args.smoothness}')
     print(f'>>> Model will be saved to: {save_path}')
 
@@ -70,6 +98,21 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="3D Registration Training")
+
+    parser.add_argument(
+        "--registration_model",
+        type=str,
+        default="swinunetr",
+        choices=[
+            "swinunetr",
+            "swin_transformer",
+            "swin",
+            "transmorph",
+            "voxelmorph",
+            "vxm",
+        ],
+        help="Registration backbone to train"
+    )
 
     parser.add_argument(
         "--smoothness",

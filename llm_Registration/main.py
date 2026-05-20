@@ -52,7 +52,7 @@ It requires mask_labels, a list of integer labels from 1 to 128.
 Decision rules:
 1. If the latest result is already acceptable, choose accept_current_model.
 2. If important organs still have low dice_after, high tre_after, or poor improvement, choose finetune_registration_model_on_roi.
-3. Choose at most 3 labels.
+3. Choose at most 10 labels.
 4. Use only organ names and labels present in selected_organs_for_llm.
 5. Do not invent organ names or labels.
 6. Output exactly one valid JSON object.
