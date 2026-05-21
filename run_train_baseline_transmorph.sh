@@ -16,7 +16,7 @@ cd ~/projects/psma_gen
 
 python Registration/train_baseline.py \
     --baseline_model transmorph \
-    --smoothness 4500 \
+    --smoothness 7000 \
     --epochs 350 \
     --num_masks 10 \
     --lr 1e-5 \

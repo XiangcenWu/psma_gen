@@ -9,3 +9,5 @@ Qwen3-8B
 Qwen3.5-9B
 gpt-oss-20b
 llm_models
+*.nii.gz
+*png
