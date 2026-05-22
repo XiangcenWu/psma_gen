@@ -48,6 +48,19 @@ loss_function_dice = DiceLoss(
     include_background=True
 )
 
+DEFAULT_REGISTRATION_INPUT_KEYS = ("fdg_pt", "psma_pt")
+CT_REGISTRATION_INPUT_KEYS = ("fdg_pt", "fdg_ct", "psma_pt", "psma_ct")
+
+
+def get_registration_input_keys(use_ct_input=False):
+    if use_ct_input:
+        return CT_REGISTRATION_INPUT_KEYS
+    return DEFAULT_REGISTRATION_INPUT_KEYS
+
+
+def make_registration_input(batch, input_keys=DEFAULT_REGISTRATION_INPUT_KEYS, device="cuda:0"):
+    return torch.cat([batch[key].to(device) for key in input_keys], dim=1)
+
 
 def train_batch(
         model, 
@@ -59,6 +72,7 @@ def train_batch(
         ct_smoothness_margin = 3000,
         ct_smoothness_gamma = 1,
         num_masks=50,
+        input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
         device="cuda:0"
     ):
     
@@ -85,13 +99,13 @@ def train_batch(
         psma_mask = batch['psma_mask'].to(device)
 
 
-        input = torch.cat([fdg_pt, psma_pt], dim=1)
+        model_input = make_registration_input(batch, input_keys, device)
 
 
 
 
 
-        ddf = model(input)
+        ddf = model(model_input)
         ddf = torch.tanh(ddf)
 
         #claculate smoothness loss first hand 
@@ -132,12 +146,13 @@ def train_batch(
 
 def get_save_path(args) -> str:
     mask_tag = "" if args.num_masks == 0 else f"k{args.num_masks}"
+    input_tag = "_ctinput" if getattr(args, "use_ct_input", False) else ""
 
     save_path=f'/data1/xiangcen/models/registration_v2/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
     if args.ct_smoothness:
-        save_path=f'/data1/xiangcen/models/registration_v2/ctsmoothness_l{int(args.smoothness)}_{mask_tag}_mar{int(args.ct_smoothness_margin)}_gam{str(args.ct_smoothness_gamma)}.ptm'
+        save_path=f'/data1/xiangcen/models/registration_v2/ctsmoothness_l{int(args.smoothness)}_{mask_tag}{input_tag}_mar{int(args.ct_smoothness_margin)}_gam{str(args.ct_smoothness_gamma)}.ptm'
     else:
-        save_path=f'/data1/xiangcen/models/registration_v2/baseline_l{int(args.smoothness)}_{mask_tag}.ptm'
+        save_path=f'/data1/xiangcen/models/registration_v2/baseline_l{int(args.smoothness)}_{mask_tag}{input_tag}.ptm'
 
 
     return save_path

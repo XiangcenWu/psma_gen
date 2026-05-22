@@ -16,8 +16,9 @@ cd ~/projects/psma_gen
 
 python Registration/train_baseline.py \
     --baseline_model voxelmorph \
-    --smoothness 7000 \
+    --smoothness 4500 \
     --epochs 350 \
     --num_masks 10 \
     --lr 1e-5 \
-    --device cuda:0
+    --device cuda:0 \
+    --use_ct_input

@@ -11,7 +11,7 @@ from General.data_loader import create_data_loader, ReadH5d
 import torch.nn as nn
 
 from General.dataset_sample import split_multiple_train_test
-from Registration.training import make_identity_grid_m11
+from Registration.training import get_registration_input_keys, make_identity_grid_m11
 
 from inferencing import inference_batch
 
@@ -28,15 +28,17 @@ def make_output_path(weights_path, result_dir=DEFAULT_RESULT_DIR):
 
 def main(args):
     device = args.device
+    input_keys = get_registration_input_keys(args.use_ct_input)
 
     model = SwinUNETR(
-        in_channels=2,
+        in_channels=len(input_keys),
         out_channels=3,
         depths=(2, 2, 2, 2),
         num_heads=(3, 6, 12, 24),
         downsample="mergingv2",
         use_v2=True,
     )
+    print(f'>>> Model input = {list(input_keys)}')
 
     train_transform = ReadH5d()
 
@@ -73,7 +75,8 @@ def main(args):
                 test_loader,
                 identity_grid,
                 filename=filename,
-                device=args.device
+                device=args.device,
+                input_keys=input_keys,
             )
     else:
         filename = make_output_path(args.weights_path)
@@ -85,7 +88,8 @@ def main(args):
             test_loader,
             identity_grid,
             filename=filename,
-            device=args.device
+            device=args.device,
+            input_keys=input_keys,
         )
 
 
@@ -107,6 +111,12 @@ if __name__ == '__main__':
         type=str,
         default="cuda:0" if torch.cuda.is_available() else "cpu",
         help="Device to run on (e.g., cuda, cuda:0, cpu)"
+    )
+
+    parser.add_argument(
+        "--use_ct_input",
+        action="store_true",
+        help="Use [fdg_pt, fdg_ct, psma_pt, psma_ct] as model input"
     )
 
 

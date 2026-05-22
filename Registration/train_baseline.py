@@ -15,7 +15,13 @@ from Registration.smoothness_losses import (
     l2_gradient,
     spatially_weighted_l2_gradient,
 )
-from Registration.training import make_identity_grid_m11, loss_function_dice
+from Registration.training import (
+    DEFAULT_REGISTRATION_INPUT_KEYS,
+    get_registration_input_keys,
+    make_identity_grid_m11,
+    make_registration_input,
+    loss_function_dice,
+)
 
 
 SPATIALLY_VARYING_MODELS = {
@@ -30,6 +36,7 @@ def is_spatially_varying_model(model_name):
 
 def get_baseline_save_path(args):
     mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
+    input_tag = "_ctinput" if args.use_ct_input else ""
     model_tag = args.baseline_model.lower().replace("-", "_")
     beta_tag = ""
     if model_tag in SPATIALLY_VARYING_MODELS:
@@ -42,7 +49,7 @@ def get_baseline_save_path(args):
         )
     return (
         "/data1/xiangcen/models/registration_v2/"
-        f"{model_tag}_l{int(args.smoothness)}{mask_tag}{beta_tag}.ptm"
+        f"{model_tag}_l{int(args.smoothness)}{mask_tag}{input_tag}{beta_tag}.ptm"
     )
 
 
@@ -71,6 +78,7 @@ def train_baseline_batch(
     beta_prior_loss=None,
     num_masks=50,
     spatially_varying_regularization=False,
+    input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
     device="cuda:0",
 ):
     model.train()
@@ -90,10 +98,11 @@ def train_baseline_batch(
         psma_pt = batch["psma_pt"].to(device)
         psma_mask = batch["psma_mask"].to(device)
 
-        model_input = torch.cat([fdg_pt, psma_pt], dim=1)
+        model_input = make_registration_input(batch, input_keys, device)
 
         if spatially_varying_regularization:
-            outputs = model(fdg_pt, psma_pt)
+            moving_input, fixed_input = torch.chunk(model_input, chunks=2, dim=1)
+            outputs = model(moving_input, fixed_input)
             ddf = outputs["ddf"]
             regularization_map = outputs["regularization_map"]
 
@@ -151,8 +160,12 @@ def train_baseline_batch(
 
 def main(args):
     device = args.device
+    input_keys = get_registration_input_keys(args.use_ct_input)
 
-    model = build_baseline_model(args.baseline_model).to(device)
+    model = build_baseline_model(
+        args.baseline_model,
+        in_channels=len(input_keys),
+    ).to(device)
 
     train_transform = ReadH5d()
 
@@ -189,6 +202,7 @@ def main(args):
     )
 
     print(f">>> Baseline model = {args.baseline_model}")
+    print(f">>> Model input = {list(input_keys)}")
     print(f">>> Smoothness lambda = {args.smoothness}")
     print(f">>> Smoothness margin = {args.smoothness_margin}")
     print(f">>> Beta lambda = {args.beta_lambda}")
@@ -208,6 +222,7 @@ def main(args):
             beta_prior_loss=beta_prior_loss,
             num_masks=args.num_masks,
             spatially_varying_regularization=spatially_varying_regularization,
+            input_keys=input_keys,
             device=device,
         )
 
@@ -274,6 +289,12 @@ if __name__ == "__main__":
         type=str,
         default="cuda:0",
         help="Training device",
+    )
+
+    parser.add_argument(
+        "--use_ct_input",
+        action="store_true",
+        help="Use [fdg_pt, fdg_ct, psma_pt, psma_ct] as model input.",
     )
 
     parser.add_argument(

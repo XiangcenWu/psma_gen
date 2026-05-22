@@ -16,11 +16,11 @@ cd ~/projects/psma_gen
 
 python Registration/train.py \
     --registration_model voxelmorph \
-    --smoothness 4500 \
+    --smoothness 7000 \
     --epochs 350 \
     --num_masks 10 \
     --lr 1e-5 \
     --ct_smoothness \
-    --ct_smoothness_margin 7000 \
+    --ct_smoothness_margin 3000 \
     --ct_smoothness_gamma 2.0 \
     --device cuda:0

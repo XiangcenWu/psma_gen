@@ -12,7 +12,7 @@ from General.dataset_sample import split_multiple_train_test
 from Registration.baseline_models import build_baseline_model
 from Registration.inferencing import inference_batch
 from Registration.train_baseline import is_spatially_varying_model
-from Registration.training import make_identity_grid_m11
+from Registration.training import get_registration_input_keys, make_identity_grid_m11
 
 
 DEFAULT_DATA_DIRS = [
@@ -113,8 +113,9 @@ def build_test_loader(args):
 def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
     model_name = infer_model_name(weights_path, args.baseline_model)
     spatially_varying = is_spatially_varying_model(model_name)
+    input_keys = get_registration_input_keys(args.use_ct_input)
 
-    base_model = build_baseline_model(model_name)
+    base_model = build_baseline_model(model_name, in_channels=len(input_keys))
     load_state_dict(base_model, weights_path, args.device)
 
     model = BaselineInferenceWrapper(
@@ -128,6 +129,7 @@ def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
         return
 
     print(f">>> Baseline model: {model_name}")
+    print(f">>> Model input: {list(input_keys)}")
     print(f">>> Weights: {weights_path}")
     print(f">>> Result: {output_path}")
 
@@ -137,6 +139,7 @@ def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
         identity_grid,
         filename=output_path,
         device=args.device,
+        input_keys=input_keys,
     )
 
 
@@ -214,6 +217,11 @@ def parse_args():
         "--overwrite",
         action="store_true",
         help="Recompute results when the output txt already exists.",
+    )
+    parser.add_argument(
+        "--use_ct_input",
+        action="store_true",
+        help="Use [fdg_pt, fdg_ct, psma_pt, psma_ct] as model input.",
     )
 
     return parser.parse_args()

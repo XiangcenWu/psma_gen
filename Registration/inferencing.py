@@ -10,6 +10,10 @@ import numpy as np
 
 from tqdm import tqdm
 from General.segments import SEGMENT_INDEX
+from Registration.training import (
+    DEFAULT_REGISTRATION_INPUT_KEYS,
+    make_registration_input,
+)
 
 from monai.losses import GlobalMutualInformationLoss
 
@@ -246,6 +250,7 @@ def inference_batch(
         identity_grid,
         filename,
         masks_names=list(SEGMENT_INDEX.keys()), # list of names
+        input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
         device="cuda:0"
     ):
 
@@ -289,7 +294,7 @@ def inference_batch(
         # mi_before.append(mutual_information(fdg_pt, psma_pt).item())
         
 
-        _input = torch.cat([fdg_pt, psma_pt], dim=1)
+        _input = make_registration_input(batch, input_keys, device)
         ddf = model(_input)
         ddf = torch.tanh(ddf)
         grid = identity_grid + ddf

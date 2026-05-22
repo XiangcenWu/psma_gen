@@ -11,14 +11,19 @@ from General.data_loader import create_data_loader, ReadH5d
 
 from General.dataset_sample import split_multiple_train_test
 from Registration.baseline_models import build_baseline_model
-from Registration.training import train_batch, make_identity_grid_m11, get_save_path
+from Registration.training import (
+    get_registration_input_keys,
+    train_batch,
+    make_identity_grid_m11,
+    get_save_path,
+)
 
 
-def build_registration_model(model_name):
+def build_registration_model(model_name, in_channels=2):
     model_name = model_name.lower().replace("-", "_")
     if model_name in ("swinunetr", "swin_transformer", "swin"):
         return SwinUNETR(
-            in_channels=2,
+            in_channels=in_channels,
             out_channels=3,
             depths=(2, 2, 2, 2),
             num_heads=(3, 6, 12, 24),
@@ -29,7 +34,7 @@ def build_registration_model(model_name):
     if model_name == "vxm":
         model_name = "voxelmorph"
 
-    return build_baseline_model(model_name)
+    return build_baseline_model(model_name, in_channels=in_channels)
 
 
 def get_model_save_path(args):
@@ -49,8 +54,12 @@ def get_model_save_path(args):
 
 def main(args):
     device = args.device
+    input_keys = get_registration_input_keys(args.use_ct_input)
 
-    model = build_registration_model(args.registration_model).to(device)
+    model = build_registration_model(
+        args.registration_model,
+        in_channels=len(input_keys),
+    ).to(device)
 
     train_transform = ReadH5d()
 
@@ -74,6 +83,7 @@ def main(args):
 
 
     print(f'>>> Registration model = {args.registration_model}')
+    print(f'>>> Model input = {list(input_keys)}')
     print(f'>>> Smoothness lambda = {args.smoothness}')
     print(f'>>> Model will be saved to: {save_path}')
 
@@ -88,6 +98,8 @@ def main(args):
             ct_smoothness_margin = args.ct_smoothness_margin,
             ct_smoothness_gamma = args.ct_smoothness_gamma,
             num_masks=args.num_masks,
+            input_keys=input_keys,
+            device=device,
         )
 
         print(f'Epoch {epoch:03d} | Loss = {loss_batch:.6f}')
@@ -147,6 +159,12 @@ if __name__ == "__main__":
         type=str,
         default="cuda:0",
         help="Training device"
+    )
+
+    parser.add_argument(
+        "--use_ct_input",
+        action="store_true",
+        help="Use [fdg_pt, fdg_ct, psma_pt, psma_ct] as model input"
     )
     
     parser.add_argument(
