@@ -23,4 +23,5 @@ python Registration/train.py \
     --ct_smoothness \
     --ct_smoothness_margin 3000 \
     --ct_smoothness_gamma 2.0 \
-    --device cuda:0
+    --device cuda:0 \
+    --use_ct_input

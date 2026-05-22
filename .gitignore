@@ -11,3 +11,4 @@ gpt-oss-20b
 llm_models
 *.nii.gz
 *png
+*.json
