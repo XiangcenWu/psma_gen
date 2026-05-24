@@ -148,11 +148,11 @@ def get_save_path(args) -> str:
     mask_tag = "" if args.num_masks == 0 else f"k{args.num_masks}"
     input_tag = "_ctinput" if getattr(args, "use_ct_input", False) else ""
 
-    save_path=f'/data1/xiangcen/models/registration_v2/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
+    save_path=f'/share/home/xcwu/registration_v3/baseline_l{int(args.smoothness)}{mask_tag}.ptm'
     if args.ct_smoothness:
-        save_path=f'/data1/xiangcen/models/registration_v2/ctsmoothness_l{int(args.smoothness)}_{mask_tag}{input_tag}_mar{int(args.ct_smoothness_margin)}_gam{str(args.ct_smoothness_gamma)}.ptm'
+        save_path=f'/share/home/xcwu/registration_v3/ctsmoothness_l{int(args.smoothness)}_{mask_tag}{input_tag}_mar{int(args.ct_smoothness_margin)}_gam{str(args.ct_smoothness_gamma)}.ptm'
     else:
-        save_path=f'/data1/xiangcen/models/registration_v2/baseline_l{int(args.smoothness)}_{mask_tag}{input_tag}.ptm'
+        save_path=f'/share/home/xcwu/registration_v3/baseline_l{int(args.smoothness)}_{mask_tag}{input_tag}.ptm'
 
 
     return save_path

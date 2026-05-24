@@ -18,8 +18,9 @@ from Registration.training import get_registration_input_keys, make_identity_gri
 DEFAULT_DATA_DIRS = [
     "/data2/xiangcen/data/pet_gen/processed/batch1_h5_v2",
     "/data2/xiangcen/data/pet_gen/processed/batch2_h5_v2",
+    "/data2/xiangcen/data/pet_gen/processed/batch3_h5_v2",
 ]
-DEFAULT_TEST_COUNTS = [40, 40]
+DEFAULT_TEST_COUNTS = [40, 40, 20]
 DEFAULT_RESULT_DIR = "/share/home/xcwu/pet_reg_results"
 CHECKPOINT_EXTENSIONS = {".pt", ".pth", ".ptm"}
 

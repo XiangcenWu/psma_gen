@@ -12,7 +12,7 @@ from Registration.baseline_models import build_baseline_model
 
 
 H5_PATH = "/data2/xiangcen/data/pet_gen/processed/batch3_h5_v2/patient_0067.h5"
-WEIGHTS_PATH = "/data1/xiangcen/models/registration_v2/svr_diff_l4500_k10_mar3000_beta1_a1.1_b1_repo_logbeta.ptm"
+WEIGHTS_PATH = "/share/home/xcwu/registration_v3/svr_diff_l4500_k10_mar3000_beta1_a1.1_b1_repo_logbeta.ptm"
 CT_KEY = "fdg_ct"
 OUTPUT_DIR = "Registration/diagrams"
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"

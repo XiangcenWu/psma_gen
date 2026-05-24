@@ -48,7 +48,7 @@ def get_baseline_save_path(args):
             f"_{args.beta_prior_mode}"
         )
     return (
-        "/data1/xiangcen/models/registration_v2/"
+        "/share/home/xcwu/registration_v3/"
         f"{model_tag}_l{int(args.smoothness)}{mask_tag}{input_tag}{beta_tag}.ptm"
     )
 
@@ -173,8 +173,9 @@ def main(args):
         [
             "/data2/xiangcen/data/pet_gen/processed/batch1_h5_v2",
             "/data2/xiangcen/data/pet_gen/processed/batch2_h5_v2",
+            "/data2/xiangcen/data/pet_gen/processed/batch3_h5_v2",
         ],
-        [40, 40],
+        [40, 40, 20],
     )
 
     train_loader = create_data_loader(
