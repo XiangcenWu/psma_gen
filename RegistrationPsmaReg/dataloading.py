@@ -72,6 +72,23 @@ def _sample_adjacent_timepoints(timepoints, rng):
     return rng.choice(adjacent_pairs)
 
 
+def _get_adjacent_timepoint_pairs(timepoints):
+    if len(timepoints) < 2:
+        raise ValueError("At least two timepoints are required.")
+    return list(zip(timepoints[:-1], timepoints[1:]))
+
+
+def _get_all_timepoint_pairs(timepoints):
+    if len(timepoints) < 2:
+        raise ValueError("At least two timepoints are required.")
+
+    pairs = []
+    for moving_index, moving_timepoint in enumerate(timepoints[:-1]):
+        for fixed_timepoint in timepoints[moving_index + 1:]:
+            pairs.append((moving_timepoint, fixed_timepoint))
+    return pairs
+
+
 def _read_tensor(h5_file, dataset_name):
 
     tensor = torch.from_numpy(h5_file[dataset_name][:])
@@ -85,6 +102,26 @@ def _read_spacing(h5_file, timepoint):
     if attr_name in h5_file.attrs:
         return tuple(h5_file.attrs[attr_name])
     return tuple(h5_file[f"{timepoint}_ct"].attrs["spacing"])
+
+
+def _load_timepoint_pair_h5(h5_file, file_name, moving_timepoint, fixed_timepoint):
+    data = {
+        "file_name": str(file_name),
+        "pair_name": f"{Path(file_name).stem}_t{moving_timepoint}_to_t{fixed_timepoint}",
+        "moving_timepoint": moving_timepoint,
+        "fixed_timepoint": fixed_timepoint,
+        "moving_spacing": _read_spacing(h5_file, moving_timepoint),
+        "fixed_spacing": _read_spacing(h5_file, fixed_timepoint),
+    }
+
+    for role, timepoint in (
+        ("moving", moving_timepoint),
+        ("fixed", fixed_timepoint),
+    ):
+        for key in DATA_KEYS:
+            data[f"{role}_{key}"] = _read_tensor(h5_file, f"{timepoint}_{key}")
+
+    return data
 
 
 def load_random_timepoint_pair_h5(file_name, seed=None):
@@ -105,26 +142,87 @@ def load_random_timepoint_pair_h5(file_name, seed=None):
         timepoints = _get_timepoints(h5_file)
         moving_timepoint, fixed_timepoint = _sample_adjacent_timepoints(timepoints, rng)
 
-        data = {
-            "file_name": str(file_name),
-            "moving_timepoint": moving_timepoint,
-            "fixed_timepoint": fixed_timepoint,
-            "moving_spacing": _read_spacing(h5_file, moving_timepoint),
-            "fixed_spacing": _read_spacing(h5_file, fixed_timepoint),
-        }
+        data = _load_timepoint_pair_h5(
+            h5_file,
+            file_name,
+            moving_timepoint,
+            fixed_timepoint,
+        )
 
-        for role, timepoint in (
-            ("moving", moving_timepoint),
-            ("fixed", fixed_timepoint),
-        ):
-            for key in DATA_KEYS:
-                data[f"{role}_{key}"] = _read_tensor(h5_file, f"{timepoint}_{key}")
 
     return data
 
+
+def load_all_adjacent_timepoint_pairs_h5(file_name):
+    """
+    Load all adjacent timepoint pairs from a patient H5 file.
+
+    For a case with timepoints [1, 2, 3, 4], this returns:
+        1->2, 2->3, 3->4
+
+    Returns:
+        list[dict], where every dict has the same keys as
+        load_random_timepoint_pair_h5.
+    """
+    with h5py.File(file_name, "r") as h5_file:
+        timepoints = _get_timepoints(h5_file)
+        adjacent_pairs = _get_adjacent_timepoint_pairs(timepoints)
+        return [
+            _load_timepoint_pair_h5(
+                h5_file,
+                file_name,
+                moving_timepoint,
+                fixed_timepoint,
+            )
+            for moving_timepoint, fixed_timepoint in adjacent_pairs
+        ]
+
+
+def load_all_timepoint_pairs_h5(file_name):
+    """
+    Load all earlier-to-later timepoint pairs from a patient H5 file.
+
+    For a case with timepoints [1, 2, 3, 4], this returns:
+        1->2, 1->3, 1->4, 2->3, 2->4, 3->4
+
+    A case with 7 timepoints returns 21 pairs. The moving timepoint is always
+    earlier than the fixed timepoint.
+
+    Returns:
+        list[dict], where every dict has the same keys as
+        load_random_timepoint_pair_h5.
+    """
+    with h5py.File(file_name, "r") as h5_file:
+        timepoints = _get_timepoints(h5_file)
+        timepoint_pairs = _get_all_timepoint_pairs(timepoints)
+        return [
+            _load_timepoint_pair_h5(
+                h5_file,
+                file_name,
+                moving_timepoint,
+                fixed_timepoint,
+            )
+            for moving_timepoint, fixed_timepoint in timepoint_pairs
+        ]
+
+
 class ReadH5PsmaRegd():
+    def __init__(self, pair_mode="random_adjacent", seed=None):
+        self.pair_mode = pair_mode
+        self.seed = seed
+
     def __call__(self, file_name):
-        return load_random_timepoint_pair_h5(file_name)
+        if self.pair_mode == "random_adjacent":
+            return load_random_timepoint_pair_h5(file_name, seed=self.seed)
+        if self.pair_mode == "all_pairs":
+            return load_all_timepoint_pairs_h5(file_name)
+        if self.pair_mode == "all_adjacent":
+            return load_all_adjacent_timepoint_pairs_h5(file_name)
+
+        raise ValueError(
+            "Unsupported pair_mode. Use 'random_adjacent', 'all_adjacent', "
+            "or 'all_pairs'."
+        )
 
 
 if __name__ == "__main__":
@@ -135,5 +233,9 @@ if __name__ == "__main__":
     
     data = load_random_timepoint_pair_h5(train_files[0])
     print(data.keys())
+    pairs = load_all_adjacent_timepoint_pairs_h5(train_files[0])
+    print(f"All adjacent pairs: {len(pairs)}")
+    pairs = load_all_timepoint_pairs_h5(train_files[0])
+    print(f"All earlier-to-later pairs: {len(pairs)}")
 
 

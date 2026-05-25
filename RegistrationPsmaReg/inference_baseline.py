@@ -4,11 +4,11 @@ import sys
 
 import torch
 import torch.nn as nn
+from monai.data import DataLoader, Dataset
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from General.data_loader import create_data_loader
 from General.segments import SEGMENT_INDEX
 from Registration.baseline_models import build_baseline_model
 from Registration.inferencing import (
@@ -163,6 +163,25 @@ def get_mask_labels(mask_names):
     return mask_labels
 
 
+def single_case_collate(batch):
+    if len(batch) != 1:
+        raise ValueError("PSMAReg inference expects DataLoader batch_size=1.")
+    return batch[0]
+
+
+def iter_pair_batches(batch):
+    if isinstance(batch, dict):
+        yield batch
+        return
+
+    if isinstance(batch, (list, tuple)):
+        for item in batch:
+            yield from iter_pair_batches(item)
+        return
+
+    raise TypeError(f"Unsupported PSMAReg inference batch type: {type(batch)}")
+
+
 @torch.no_grad()
 def inference_psmareg_batch(
     model,
@@ -193,69 +212,72 @@ def inference_psmareg_batch(
     tre_before_lists = [[] for _ in range(num_masks)]
     tre_after_lists = [[] for _ in range(num_masks)]
 
-    for batch in tqdm(loader, desc="inferencing", total=len(loader)):
-        model_input = make_psmareg_registration_input(batch, input_keys, device)
-        if model_input.shape[0] != 1:
-            raise ValueError(
-                f"Expected batch size 1 for inference, got {model_input.shape[0]}"
-            )
+    for patient_batch in tqdm(loader, desc="inferencing", total=len(loader)):
+        for batch in iter_pair_batches(patient_batch):
+            model_input = make_psmareg_registration_input(batch, input_keys, device)
+            if model_input.shape[0] != 1:
+                raise ValueError(
+                    f"Expected batch size 1 for inference, got {model_input.shape[0]}"
+                )
 
-        moving_mask = ensure_batched_channel_dim(batch[moving_mask_key]).to(device)
-        fixed_mask = ensure_batched_channel_dim(batch[fixed_mask_key]).to(device)
+            moving_mask = ensure_batched_channel_dim(batch[moving_mask_key]).to(device)
+            fixed_mask = ensure_batched_channel_dim(batch[fixed_mask_key]).to(device)
 
-        moving_spacing = spacing_to_list(batch["moving_spacing"])
-        fixed_spacing = spacing_to_list(batch["fixed_spacing"])
-        spacing = [
-            (moving_value + fixed_value) / 2.0
-            for moving_value, fixed_value in zip(moving_spacing, fixed_spacing)
-        ]
+            moving_spacing = spacing_to_list(batch["moving_spacing"])
+            fixed_spacing = spacing_to_list(batch["fixed_spacing"])
+            spacing = [
+                (moving_value + fixed_value) / 2.0
+                for moving_value, fixed_value in zip(moving_spacing, fixed_spacing)
+            ]
 
-        ddf = model(model_input)
-        ddf = torch.tanh(ddf)
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
+            ddf = model(model_input)
+            ddf = torch.tanh(ddf)
+            grid = identity_grid + ddf
+            grid = grid.permute(0, 2, 3, 4, 1)
 
-        for idx, label in enumerate(mask_labels):
-            binary_moving_mask = get_binary_mask_with_label(
-                moving_mask,
-                label,
-            ).float()
-            binary_fixed_mask = get_binary_mask_with_label(
-                fixed_mask,
-                label,
-            ).float()
+            for idx, label in enumerate(mask_labels):
+                binary_moving_mask = get_binary_mask_with_label(
+                    moving_mask,
+                    label,
+                ).float()
+                binary_fixed_mask = get_binary_mask_with_label(
+                    fixed_mask,
+                    label,
+                ).float()
 
-            dice_before_lists[idx].append(
-                dice_metric(binary_moving_mask, binary_fixed_mask).cpu().item()
-            )
-            tre_before_lists[idx].append(
-                compute_tre_single(
+                dice_before_lists[idx].append(
+                    dice_metric(binary_moving_mask, binary_fixed_mask).cpu().item()
+                )
+                tre_before_lists[idx].append(
+                    compute_tre_single(
+                        binary_moving_mask,
+                        binary_fixed_mask,
+                        spacing,
+                    )
+                    .cpu()
+                    .item()
+                )
+
+                warped_moving_mask = torch.nn.functional.grid_sample(
                     binary_moving_mask,
-                    binary_fixed_mask,
-                    spacing,
+                    grid,
+                    align_corners=True,
                 )
-                .cpu()
-                .item()
-            )
 
-            warped_moving_mask = torch.nn.functional.grid_sample(
-                binary_moving_mask,
-                grid,
-                align_corners=True,
-            )
-
-            dice_after_lists[idx].append(
-                dice_metric(warped_moving_mask, binary_fixed_mask).cpu().item()
-            )
-            tre_after_lists[idx].append(
-                compute_tre_single(
-                    warped_moving_mask,
-                    binary_fixed_mask,
-                    spacing,
+                dice_after_lists[idx].append(
+                    dice_metric(warped_moving_mask, binary_fixed_mask).cpu().item()
                 )
-                .cpu()
-                .item()
-            )
+                tre_after_lists[idx].append(
+                    compute_tre_single(
+                        warped_moving_mask,
+                        binary_fixed_mask,
+                        spacing,
+                    )
+                    .cpu()
+                    .item()
+                )
+    print(f"len of dice_before_lists: {[len(lst) for lst in dice_before_lists]}")
+    print(f"len of dice_after_lists: {[len(lst) for lst in dice_after_lists]}")
 
     save_registration_results(
         filename,
@@ -273,12 +295,14 @@ def build_test_loader(args):
         test_ratio=args.test_ratio,
         seed=args.seed,
     )
-    transform = ReadH5PsmaRegd()
+    transform = ReadH5PsmaRegd(pair_mode=args.pair_mode)
 
-    test_loader = create_data_loader(
-        test_list,
-        transform,
+    test_dataset = Dataset(test_list, transform)
+    test_loader = DataLoader(
+        test_dataset,
+        num_workers=args.num_workers,
         batch_size=1,
+        collate_fn=single_case_collate,
         shuffle=False,
     )
 
@@ -334,6 +358,7 @@ def main(args):
 
     print(f">>> PSMAReg root: {args.root_dir}")
     print(f">>> Test cases: {len(test_list)}")
+    print(f">>> Pair mode: {args.pair_mode}")
     print(f">>> Example test cases: {test_list[:3]}")
 
     for weights_path in weights_paths:
@@ -390,6 +415,16 @@ def parse_args():
         help="Random seed used for train/test split.",
     )
     parser.add_argument(
+        "--pair_mode",
+        type=str,
+        default="all_pairs",
+        choices=["all_pairs", "all_adjacent", "random_adjacent"],
+        help=(
+            "Timepoint-pair sampling mode. all_pairs evaluates every "
+            "earlier-to-later timepoint pair in each H5 file."
+        ),
+    )
+    parser.add_argument(
         "--mask_key",
         type=str,
         default="ct_label",
@@ -418,6 +453,12 @@ def parse_args():
         type=str,
         default="cuda:0" if torch.cuda.is_available() else "cpu",
         help="Device to run on, for example cuda:0 or cpu.",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=6,
+        help="Number of DataLoader worker processes.",
     )
     parser.add_argument(
         "--overwrite",
