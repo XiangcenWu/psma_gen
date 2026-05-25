@@ -10,7 +10,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from General.data_loader import ReadH5d
 from Registration.mask import labels_to_binary_masks
 from Registration.smoothness_losses import l2_gradient
-from Registration.training import loss_function_dice, make_identity_grid_m11
+from Registration.training import (
+    loss_function_dice,
+    make_identity_grid_m11,
+    predict_ddf_and_grid,
+)
 from llm_Registration.config import DEVICE, REGISTRATION_WEIGHTS_PATH, SPATIAL_SIZE
 
 
@@ -110,12 +114,9 @@ def finetune_registration_model_on_roi(
 
     for epoch in range(epochs):
         model_input = torch.cat([fdg_pt, psma_pt], dim=1)
-        ddf = torch.tanh(model(model_input))
+        ddf, grid = predict_ddf_and_grid(model, model_input, identity_grid)
 
         smoothness_loss = smoothness_lambda * l2_gradient(ddf)
-
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
 
         warped_fdg_roi_masks = torch.nn.functional.grid_sample(fdg_roi_masks, grid)
         warped_fdg_ct = torch.nn.functional.grid_sample(fdg_ct, grid)

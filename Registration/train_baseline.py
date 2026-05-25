@@ -10,46 +10,33 @@ from General.data_loader import create_data_loader, ReadH5d
 from General.dataset_sample import split_multiple_train_test
 from Registration.baseline_models import build_baseline_model
 from Registration.mask import sample_labels_to_binary, sample_shared_binary_masks
-from Registration.smoothness_losses import (
-    BetaPriorLoss,
-    l2_gradient,
-    spatially_weighted_l2_gradient,
-)
+from Registration.smoothness_losses import l2_gradient
 from Registration.training import (
     DEFAULT_REGISTRATION_INPUT_KEYS,
+    get_ct_lambda,
     get_registration_input_keys,
     make_identity_grid_m11,
     make_registration_input,
+    predict_ddf_and_grid,
     loss_function_dice,
 )
-
-
-SPATIALLY_VARYING_MODELS = {
-    "svr_diff",
-    "spatially_varying_regularization",
-}
-
-
-def is_spatially_varying_model(model_name):
-    return model_name.lower().replace("-", "_") in SPATIALLY_VARYING_MODELS
 
 
 def get_baseline_save_path(args):
     mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
     input_tag = "_ctinput" if args.use_ct_input else ""
     model_tag = args.baseline_model.lower().replace("-", "_")
-    beta_tag = ""
-    if model_tag in SPATIALLY_VARYING_MODELS:
-        beta_tag = (
-            f"_mar{int(args.smoothness_margin)}"
-            f"_beta{args.beta_lambda:g}"
-            f"_a{args.beta_alpha:g}"
-            f"_b{args.beta_beta:g}"
-            f"_{args.beta_prior_mode}"
+    ct_smoothness_tag = ""
+    if getattr(args, "ct_smoothness", False):
+        ct_smoothness_tag = (
+            f"_ctsmoothness"
+            f"_mar{int(getattr(args, 'ct_smoothness_margin', 3000.0))}"
+            f"_gam{getattr(args, 'ct_smoothness_gamma', 1.0):g}"
         )
     return (
         "/share/home/xcwu/registration_v3/"
-        f"{model_tag}_l{int(args.smoothness)}{mask_tag}{input_tag}{beta_tag}.ptm"
+        f"{model_tag}_l{int(args.smoothness)}"
+        f"{mask_tag}{input_tag}{ct_smoothness_tag}.ptm"
     )
 
 
@@ -73,11 +60,10 @@ def train_baseline_batch(
     optimizer,
     identity_grid,
     smoothness_lambda=1000,
-    smoothness_margin=3000,
-    beta_lambda=1.0,
-    beta_prior_loss=None,
+    ct_smoothness=False,
+    ct_smoothness_margin=3000,
+    ct_smoothness_gamma=1,
     num_masks=50,
-    spatially_varying_regularization=False,
     input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
     device="cuda:0",
 ):
@@ -100,36 +86,17 @@ def train_baseline_batch(
 
         model_input = make_registration_input(batch, input_keys, device)
 
-        if spatially_varying_regularization:
-            moving_input, fixed_input = torch.chunk(model_input, chunks=2, dim=1)
-            outputs = model(moving_input, fixed_input)
-            ddf = outputs["ddf"]
-            regularization_map = outputs["regularization_map"]
-
-            lambda_min = smoothness_lambda - smoothness_margin
-            lambda_max = smoothness_lambda + smoothness_margin
-            if lambda_min <= 0:
-                raise ValueError(
-                    "smoothness - smoothness_margin must be positive for "
-                    "spatially varying regularization."
-                )
-            regularization_weight_map = (
-                lambda_min
-                + regularization_map * (lambda_max - lambda_min)
+        ddf, grid = predict_ddf_and_grid(model, model_input, identity_grid)
+        if ct_smoothness:
+            tensor_weights = get_ct_lambda(
+                fdg_ct,
+                ct_smoothness_margin,
+                smoothness_lambda,
+                ct_smoothness_gamma,
             )
-
-            smoothness_loss = spatially_weighted_l2_gradient(
-                ddf,
-                regularization_weight_map,
-            )
-            beta_loss = beta_lambda * beta_prior_loss(regularization_map)
+            smoothness_loss = l2_gradient(ddf, tensor_weights)
         else:
-            ddf = torch.tanh(model(model_input))
             smoothness_loss = smoothness_lambda * l2_gradient(ddf)
-            beta_loss = torch.zeros((), device=device)
-
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
 
         fdg_masks, psma_masks = get_mask_loss_inputs(
             fdg_mask,
@@ -145,7 +112,6 @@ def train_baseline_batch(
             loss_function_dice(psma_masks, warped_moving_masks)
             + loss_function_dice(warped_moving_ct, psma_ct)
             + smoothness_loss
-            + beta_loss
         )
 
         loss.backward()
@@ -193,22 +159,13 @@ def main(args):
     )
 
     save_path = get_baseline_save_path(args)
-    spatially_varying_regularization = is_spatially_varying_model(
-        args.baseline_model,
-    )
-    beta_prior_loss = BetaPriorLoss(
-        alpha=args.beta_alpha,
-        beta=args.beta_beta,
-        mode=args.beta_prior_mode,
-    )
 
     print(f">>> Baseline model = {args.baseline_model}")
     print(f">>> Model input = {list(input_keys)}")
     print(f">>> Smoothness lambda = {args.smoothness}")
-    print(f">>> Smoothness margin = {args.smoothness_margin}")
-    print(f">>> Beta lambda = {args.beta_lambda}")
-    print(f">>> Beta prior = Beta({args.beta_alpha}, {args.beta_beta}), mode={args.beta_prior_mode}")
-    print(f">>> Spatially varying regularization = {spatially_varying_regularization}")
+    print(f">>> CT smoothness = {args.ct_smoothness}")
+    print(f">>> CT smoothness margin = {args.ct_smoothness_margin}")
+    print(f">>> CT smoothness gamma = {args.ct_smoothness_gamma}")
     print(f">>> Model will be saved to: {save_path}")
 
     for epoch in range(args.epochs):
@@ -218,11 +175,10 @@ def main(args):
             optimizer,
             identity_grid,
             smoothness_lambda=args.smoothness,
-            smoothness_margin=args.smoothness_margin,
-            beta_lambda=args.beta_lambda,
-            beta_prior_loss=beta_prior_loss,
+            ct_smoothness=args.ct_smoothness,
+            ct_smoothness_margin=args.ct_smoothness_margin,
+            ct_smoothness_gamma=args.ct_smoothness_gamma,
             num_masks=args.num_masks,
-            spatially_varying_regularization=spatially_varying_regularization,
             input_keys=input_keys,
             device=device,
         )
@@ -242,10 +198,7 @@ if __name__ == "__main__":
         default="voxelmorph",
         choices=[
             "voxelmorph",
-            "vxm",
             "transmorph",
-            "svr_diff",
-            "spatially_varying_regularization",
         ],
         help="Baseline model architecture to train.",
     )
@@ -255,13 +208,6 @@ if __name__ == "__main__":
         type=float,
         default=8000,
         help="Smoothness regularization weight (lambda)",
-    )
-
-    parser.add_argument(
-        "--smoothness_margin",
-        type=float,
-        default=3000,
-        help="Margin for SVR regularization weights: [lambda-margin, lambda+margin].",
     )
 
     parser.add_argument(
@@ -297,34 +243,22 @@ if __name__ == "__main__":
         action="store_true",
         help="Use [fdg_pt, fdg_ct, psma_pt, psma_ct] as model input.",
     )
-
     parser.add_argument(
-        "--beta_lambda",
+        "--ct_smoothness",
+        action="store_true",
+        help="Enable CT as DDF smoothness regularization.",
+    )
+    parser.add_argument(
+        "--ct_smoothness_margin",
+        type=float,
+        default=3000.0,
+        help="Margin value for CT smoothness regularization.",
+    )
+    parser.add_argument(
+        "--ct_smoothness_gamma",
         type=float,
         default=1.0,
-        help="Weight for Beta prior regularization on spatial weights.",
-    )
-
-    parser.add_argument(
-        "--beta_alpha",
-        type=float,
-        default=1.1,
-        help="Alpha parameter of the Beta prior.",
-    )
-
-    parser.add_argument(
-        "--beta_beta",
-        type=float,
-        default=1.0,
-        help="Beta parameter of the Beta prior.",
-    )
-
-    parser.add_argument(
-        "--beta_prior_mode",
-        type=str,
-        default="full_beta",
-        choices=["full_beta", "repo_logbeta"],
-        help="Beta prior loss mode for spatial regularization weights.",
+        help="Gamma value for CT smoothness regularization.",
     )
 
     args = parser.parse_args()

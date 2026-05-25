@@ -3,7 +3,6 @@ import os
 import sys
 
 import torch
-import torch.nn as nn
 from monai.data import DataLoader, Dataset
 from tqdm import tqdm
 
@@ -17,8 +16,7 @@ from Registration.inferencing import (
     get_binary_mask_with_label,
     save_registration_results,
 )
-from Registration.train_baseline import is_spatially_varying_model
-from Registration.training import make_identity_grid_m11
+from Registration.training import make_identity_grid_m11, predict_ddf_and_grid
 from RegistrationPsmaReg.dataloading import ReadH5PsmaRegd, get_train_test_h5_lists
 
 
@@ -35,32 +33,6 @@ CT_REGISTRATION_INPUT_KEYS = (
 
 DEFAULT_RESULT_DIR = "/share/home/xcwu/psmareg_reg_results"
 CHECKPOINT_EXTENSIONS = {".pt", ".pth", ".ptm"}
-
-
-class BaselineInferenceWrapper(nn.Module):
-    """
-    Adapt baseline models to the interface expected by inference_psmareg_batch.
-
-    VoxelMorph and TransMorph receive concat(moving, fixed) and return a raw flow.
-    SVR-Diff receives moving/fixed separately and returns a dict whose ddf is
-    already tanh-normalized. inference_psmareg_batch applies tanh to model output,
-    so this wrapper returns atanh(ddf) for SVR-Diff to preserve the trained DDF.
-    """
-
-    def __init__(self, model, spatially_varying=False, eps=1e-6):
-        super().__init__()
-        self.model = model
-        self.spatially_varying = spatially_varying
-        self.eps = eps
-
-    def forward(self, model_input):
-        if not self.spatially_varying:
-            return self.model(model_input)
-
-        moving, fixed = torch.chunk(model_input, chunks=2, dim=1)
-        outputs = self.model(moving, fixed)
-        ddf = outputs["ddf"].clamp(-1.0 + self.eps, 1.0 - self.eps)
-        return torch.atanh(ddf)
 
 
 def ensure_batched_channel_dim(tensor):
@@ -94,14 +66,12 @@ def infer_model_name(weights_path, fallback):
     name = os.path.basename(weights_path).lower().replace("-", "_")
     if "transmorph" in name:
         return "transmorph"
-    if "svr_diff" in name or "spatially_varying" in name:
-        return "svr_diff"
     if "voxelmorph" in name or "vxm" in name:
         return "voxelmorph"
 
     raise ValueError(
         "Cannot infer baseline model from checkpoint name. "
-        "Please pass --baseline_model voxelmorph, transmorph, or svr_diff."
+        "Please pass --baseline_model voxelmorph or transmorph."
     )
 
 
@@ -230,10 +200,7 @@ def inference_psmareg_batch(
                 for moving_value, fixed_value in zip(moving_spacing, fixed_spacing)
             ]
 
-            ddf = model(model_input)
-            ddf = torch.tanh(ddf)
-            grid = identity_grid + ddf
-            grid = grid.permute(0, 2, 3, 4, 1)
+            _, grid = predict_ddf_and_grid(model, model_input, identity_grid)
 
             for idx, label in enumerate(mask_labels):
                 binary_moving_mask = get_binary_mask_with_label(
@@ -311,16 +278,10 @@ def build_test_loader(args):
 
 def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
     model_name = infer_model_name(weights_path, args.baseline_model)
-    spatially_varying = is_spatially_varying_model(model_name)
     input_keys = get_psmareg_registration_input_keys(args.use_ct_input)
 
     base_model = build_baseline_model(model_name, in_channels=len(input_keys))
     load_state_dict(base_model, weights_path, args.device)
-
-    model = BaselineInferenceWrapper(
-        base_model,
-        spatially_varying=spatially_varying,
-    )
 
     output_path = make_output_path(weights_path, args.result_dir)
     if os.path.exists(output_path) and not args.overwrite:
@@ -334,7 +295,7 @@ def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
     print(f">>> Result: {output_path}")
 
     inference_psmareg_batch(
-        model,
+        base_model,
         test_loader,
         identity_grid,
         filename=output_path,
@@ -383,10 +344,7 @@ def parse_args():
         choices=[
             "auto",
             "voxelmorph",
-            "vxm",
             "transmorph",
-            "svr_diff",
-            "spatially_varying_regularization",
         ],
         help="Baseline architecture. Use auto when checkpoint names include the model tag.",
     )

@@ -13,6 +13,7 @@ from General.segments import SEGMENT_INDEX
 from Registration.training import (
     DEFAULT_REGISTRATION_INPUT_KEYS,
     make_registration_input,
+    predict_ddf_and_grid,
 )
 
 from monai.losses import GlobalMutualInformationLoss
@@ -175,38 +176,6 @@ def tre_surface_from_masks(fixed_mask, moving_mask, spacing):
 
 
 
-# def dice_for_organs(moving: torch.Tensor, fixed: torch.Tensor, organ_names: list, eps: float = 1e-6) -> list:
-#     """
-#     Calculate Dice scores for a list of organs using dice_metric.
-
-#     Parameters:
-#         moving: tensor of moving segmentation (H,W,D) or (B,H,W,D)
-#         fixed: tensor of fixed segmentation (same shape as moving)
-#         organ_names: list of strings, organ names in SEGMENT_INDEX
-#         eps: small value to avoid division by zero
-
-#     Returns:
-#         List of Dice scores (float) in the same order as organ_names
-#     """
-#     dice_scores = []
-    
-#     for organ_name in organ_names:
-#         if organ_name not in SEGMENT_INDEX:
-#             raise ValueError(f"Organ '{organ_name}' not in SEGMENT_INDEX")
-        
-#         organ_label = SEGMENT_INDEX[organ_name]
-
-#         # Create binary masks for the organ
-#         moving_mask = (moving == organ_label).float()
-#         fixed_mask = (fixed == organ_label).float()
-
-#         # Compute Dice using dice_metric
-#         dice_score = dice_metric(moving_mask, fixed_mask, eps)
-#         dice_scores.append(dice_score.item())
-    
-#     return dice_scores
-
-
 def save_registration_results(
     filename, masks_names, dice_before_lists, dice_after_lists, tre_before_lists, tre_after_lists
 ):
@@ -295,10 +264,7 @@ def inference_batch(
         
 
         _input = make_registration_input(batch, input_keys, device)
-        ddf = model(_input)
-        ddf = torch.tanh(ddf)
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
+        _, grid = predict_ddf_and_grid(model, _input, identity_grid)
 
         # warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
         # mi_after.append(mutual_information(warped_fdg_pt, psma_pt).cpu().item())
@@ -456,10 +422,7 @@ def inference_batch_whole_body(
 
 
         _input = torch.cat([fdg_pt, psma_pt], dim=1)
-        ddf = model(_input)
-        ddf = torch.tanh(ddf)
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
+        _, grid = predict_ddf_and_grid(model, _input, identity_grid)
 
         warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
         mi.append(mutual_information(warped_fdg_pt, psma_pt).cpu().item())

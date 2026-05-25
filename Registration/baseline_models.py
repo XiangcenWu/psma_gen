@@ -9,14 +9,11 @@ All models in this file follow the same interface used by Registration/train.py:
 The training code can keep using:
 
     ddf = torch.tanh(model(input))
-
-For the spatially varying regularization model, forward(moving, fixed) returns
-a dict with only ddf and regularization_map.
 """
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -251,128 +248,9 @@ class TransMorph3D(nn.Module):
         return self.flow(y)
 
 
-class FlowHead3D(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int = 3) -> None:
-        super().__init__()
-        self.head = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
-        _init_flow_layer(self.head)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.head(x)
-
-
-class RegWeightHead3D(nn.Module):
-    def __init__(self, in_channels: int, eps: float = 1e-6) -> None:
-        super().__init__()
-        self.eps = eps
-        self.logits = nn.Conv3d(in_channels, 1, kernel_size=3, padding=1)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        logits = self.logits(x)
-        weight = torch.sigmoid(logits)
-        weight = torch.clamp(weight, self.eps, 1.0 - self.eps)
-        return weight
-
-
-class SpatiallyVaryingRegularizationDiffReg3D(nn.Module):
-    """
-    Beta-prior spatially varying regularization baseline for 3D registration.
-
-    The model uses one shared 3D U-Net encoder-decoder and two heads:
-    a direct DDF head and a voxel-wise regularization-weight head. The
-    regularization map is predicted at a lower resolution, upsampled to the
-    DDF size for smoother spatial weights, and constrained to (eps, 1 - eps).
-    Apply BetaPriorLoss to regularization_map during training to impose the
-    Beta distribution prior.
-    """
-
-    def __init__(
-        self,
-        in_channels: int = 2,
-        out_channels: int = 3,
-        enc_channels: Tuple[int, int, int, int, int] = (32, 64, 128, 256, 256),
-        dec_channels: Tuple[int, int, int, int] = (256, 128, 64, 32),
-        eps: float = 1e-6,
-        reg_map_downsample_factor: int = 2,
-    ) -> None:
-        super().__init__()
-        if reg_map_downsample_factor < 1:
-            raise ValueError("reg_map_downsample_factor must be >= 1.")
-
-        c0, c1, c2, c3, c4 = enc_channels
-        d3, d2, d1, d0 = dec_channels
-        self.reg_map_downsample_factor = int(reg_map_downsample_factor)
-
-        self.encoder0 = ConvBlock3D(in_channels, c0, norm=True)
-        self.encoder1 = ConvBlock3D(c0, c1, stride=2, norm=True)
-        self.encoder2 = ConvBlock3D(c1, c2, stride=2, norm=True)
-        self.encoder3 = ConvBlock3D(c2, c3, stride=2, norm=True)
-        self.bottleneck = ConvBlock3D(c3, c4, stride=2, norm=True)
-
-        self.decoder3 = UpBlock3D(c4, c3, d3, norm=True)
-        self.decoder2 = UpBlock3D(d3, c2, d2, norm=True)
-        self.decoder1 = UpBlock3D(d2, c1, d1, norm=True)
-        self.decoder0 = UpBlock3D(d1, c0, d0, norm=True)
-        self.refine = ConvBlock3D(d0, d0, norm=True)
-
-        self.flow_head = FlowHead3D(d0, out_channels=out_channels)
-        self.reg_weight_head = RegWeightHead3D(d0, eps=eps)
-
-    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
-        x0 = self.encoder0(x)
-        x1 = self.encoder1(x0)
-        x2 = self.encoder2(x1)
-        x3 = self.encoder3(x2)
-        xb = self.bottleneck(x3)
-
-        y = self.decoder3(xb, x3)
-        y = self.decoder2(y, x2)
-        y = self.decoder1(y, x1)
-        y = self.decoder0(y, x0)
-        return self.refine(y)
-
-    def predict_regularization_map(self, features: torch.Tensor) -> torch.Tensor:
-        factor = self.reg_map_downsample_factor
-        if factor == 1:
-            return self.reg_weight_head(features)
-
-        full_size = features.shape[2:]
-        low_res_size = tuple(max(1, size // factor) for size in full_size)
-
-        low_res_features = F.interpolate(
-            features,
-            size=low_res_size,
-            mode="trilinear",
-            align_corners=True,
-        )
-        low_res_map = self.reg_weight_head(low_res_features)
-
-        return F.interpolate(
-            low_res_map,
-            size=full_size,
-            mode="trilinear",
-            align_corners=True,
-        )
-
-    def forward(self, moving: torch.Tensor, fixed: torch.Tensor) -> Dict[str, torch.Tensor]:
-        x = torch.cat([moving, fixed], dim=1)
-        features = self.encode_decode(x)
-        raw_flow = self.flow_head(features)
-        ddf = torch.tanh(raw_flow)
-        regularization_map = self.predict_regularization_map(features)
-        return {
-            "ddf": ddf,
-            "regularization_map": regularization_map,
-        }
-
-
-
 BASELINE_MODEL_REGISTRY = {
     "voxelmorph": VoxelMorph3D,
-    "vxm": VoxelMorph3D,
     "transmorph": TransMorph3D,
-    "svr_diff": SpatiallyVaryingRegularizationDiffReg3D,
-    "spatially_varying_regularization": SpatiallyVaryingRegularizationDiffReg3D,
 }
 
 
@@ -411,7 +289,7 @@ if __name__ == "__main__":
     except ImportError as exc:
         print(f"Skip SwinUNETR parameter count because MONAI is unavailable: {exc}")
 
-    for name in ("voxelmorph", "transmorph", "svr_diff"):
+    for name in ("voxelmorph", "transmorph"):
         models[name] = build_baseline_model(name)
 
     print("Model parameter counts:")

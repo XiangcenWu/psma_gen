@@ -62,85 +62,22 @@ def make_registration_input(batch, input_keys=DEFAULT_REGISTRATION_INPUT_KEYS, d
     return torch.cat([batch[key].to(device) for key in input_keys], dim=1)
 
 
-def train_batch(
-        model, 
-        loader,
-        optimizer,
-        identity_grid,
-        smoothness_lambda=1000,
-        ct_smoothness = False,
-        ct_smoothness_margin = 3000,
-        ct_smoothness_gamma = 1,
-        num_masks=50,
-        input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
-        device="cuda:0"
-    ):
-    
-    model.train()
-    model.to(device)
-    identity_grid.to(device)
+def predict_ddf_and_grid(model, model_input, identity_grid, apply_tanh=True):
+    """
+    Run a registration model and build the grid_sample sampling grid.
 
-    step = 0.
-    loss_a = 0.
-
-
-    for batch in loader:
-
-        fdg_ct = batch['fdg_ct'].to(device)
-        psma_ct = batch['psma_ct'].to(device)
-
-
-        fdg_pt = batch['fdg_pt'].to(device)
-        fdg_mask = batch['fdg_mask'].to(device)
-
-        
-        
-        psma_pt = batch['psma_pt'].to(device)
-        psma_mask = batch['psma_mask'].to(device)
-
-
-        model_input = make_registration_input(batch, input_keys, device)
-
-
-
-
-
-        ddf = model(model_input)
+    Returns:
+        ddf: shape (B, ndim, *spatial_size), in normalized grid coordinates.
+        grid: shape (B, *spatial_size, ndim), ready for torch.nn.functional.grid_sample.
+    """
+    ddf = model(model_input)
+    if apply_tanh:
         ddf = torch.tanh(ddf)
 
-        #claculate smoothness loss first hand 
-        if ct_smoothness:
-            tensor_weights = get_ct_lambda(fdg_ct, ct_smoothness_margin, smoothness_lambda, ct_smoothness_gamma)
-            smoothness_loss = l2_gradient(ddf, tensor_weights)
-        else:
-            smoothness_loss = smoothness_lambda*l2_gradient(ddf)
+    grid = identity_grid.to(device=ddf.device, dtype=ddf.dtype) + ddf
+    grid = torch.movedim(grid, 1, -1)
+    return ddf, grid
 
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
-
-        if num_masks != 0:
-            fdg_masks, psma_masks = sample_shared_binary_masks(
-                moving_mask = fdg_mask,
-                fixed_mask=psma_mask,
-                num_samples=num_masks
-            )
-        warped_moving_masks = torch.nn.functional.grid_sample(fdg_masks, grid)
-
-
-        warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
-        loss = loss_function_dice(psma_masks, warped_moving_masks) + \
-            loss_function_dice(warped_moving_ct, psma_ct) + smoothness_loss
-
-
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-
-        loss_a += loss.item()
-        step += 1.
-    loss_of_this_epoch = loss_a / step
-
-    return loss_of_this_epoch
 
 
 

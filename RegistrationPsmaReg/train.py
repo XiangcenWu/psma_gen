@@ -16,6 +16,7 @@ from Registration.training import (
     get_save_path,
     loss_function_dice,
     make_identity_grid_m11,
+    predict_ddf_and_grid,
 )
 from RegistrationPsmaReg.dataloading import ReadH5PsmaRegd, get_train_test_h5_lists
 
@@ -124,8 +125,7 @@ def train_psmareg_batch(
 
         model_input = make_psmareg_registration_input(batch, input_keys, device)
 
-        ddf = model(model_input)
-        ddf = torch.tanh(ddf)
+        ddf, grid = predict_ddf_and_grid(model, model_input, identity_grid)
 
         if ct_smoothness:
             tensor_weights = get_ct_lambda(
@@ -137,9 +137,6 @@ def train_psmareg_batch(
             smoothness_loss = l2_gradient(ddf, tensor_weights)
         else:
             smoothness_loss = smoothness_lambda * l2_gradient(ddf)
-
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
 
         moving_masks, fixed_masks = get_mask_loss_inputs(
             moving_mask,

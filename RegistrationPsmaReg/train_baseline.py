@@ -8,17 +8,16 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from General.data_loader import create_data_loader
 from Registration.baseline_models import build_baseline_model
-from Registration.smoothness_losses import (
-    BetaPriorLoss,
-    l2_gradient,
-    spatially_weighted_l2_gradient,
-)
+from Registration.smoothness_losses import l2_gradient
 from Registration.train_baseline import (
     get_baseline_save_path,
     get_mask_loss_inputs,
-    is_spatially_varying_model,
 )
-from Registration.training import make_identity_grid_m11, loss_function_dice
+from Registration.training import (
+    make_identity_grid_m11,
+    loss_function_dice,
+    predict_ddf_and_grid,
+)
 from RegistrationPsmaReg.dataloading import ReadH5PsmaRegd, get_train_test_h5_lists
 
 
@@ -63,11 +62,7 @@ def train_baseline_batch(
     optimizer,
     identity_grid,
     smoothness_lambda=1000,
-    smoothness_margin=3000,
-    beta_lambda=1.0,
-    beta_prior_loss=None,
     num_masks=50,
-    spatially_varying_regularization=False,
     input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
     mask_key="ct_label",
     device="cuda:0",
@@ -91,36 +86,8 @@ def train_baseline_batch(
 
         model_input = make_psmareg_registration_input(batch, input_keys, device)
 
-        if spatially_varying_regularization:
-            moving_input, fixed_input = torch.chunk(model_input, chunks=2, dim=1)
-            outputs = model(moving_input, fixed_input)
-            ddf = outputs["ddf"]
-            regularization_map = outputs["regularization_map"]
-
-            lambda_min = smoothness_lambda - smoothness_margin
-            lambda_max = smoothness_lambda + smoothness_margin
-            if lambda_min <= 0:
-                raise ValueError(
-                    "smoothness - smoothness_margin must be positive for "
-                    "spatially varying regularization."
-                )
-
-            regularization_weight_map = (
-                lambda_min
-                + regularization_map * (lambda_max - lambda_min)
-            )
-            smoothness_loss = spatially_weighted_l2_gradient(
-                ddf,
-                regularization_weight_map,
-            )
-            beta_loss = beta_lambda * beta_prior_loss(regularization_map)
-        else:
-            ddf = torch.tanh(model(model_input))
-            smoothness_loss = smoothness_lambda * l2_gradient(ddf)
-            beta_loss = torch.zeros((), device=device)
-
-        grid = identity_grid + ddf
-        grid = grid.permute(0, 2, 3, 4, 1)
+        ddf, grid = predict_ddf_and_grid(model, model_input, identity_grid)
+        smoothness_loss = smoothness_lambda * l2_gradient(ddf)
 
         moving_masks, fixed_masks = get_mask_loss_inputs(
             moving_mask,
@@ -136,7 +103,6 @@ def train_baseline_batch(
             loss_function_dice(fixed_masks, warped_moving_masks)
             + loss_function_dice(warped_moving_ct, fixed_ct)
             + smoothness_loss
-            + beta_loss
         )
 
         loss.backward()
@@ -181,10 +147,7 @@ def build_arg_parser(description="3D Baseline Registration Training on PSMAReg H
         default="voxelmorph",
         choices=[
             "voxelmorph",
-            "vxm",
             "transmorph",
-            "svr_diff",
-            "spatially_varying_regularization",
         ],
         help="Baseline model architecture to train.",
     )
@@ -193,12 +156,6 @@ def build_arg_parser(description="3D Baseline Registration Training on PSMAReg H
         type=float,
         default=8000,
         help="Smoothness regularization weight (lambda)",
-    )
-    parser.add_argument(
-        "--smoothness_margin",
-        type=float,
-        default=3000,
-        help="Margin for SVR regularization weights: [lambda-margin, lambda+margin].",
     )
     parser.add_argument(
         "--epochs",
@@ -229,32 +186,6 @@ def build_arg_parser(description="3D Baseline Registration Training on PSMAReg H
         action="store_true",
         help="Use PET and CT image pairs as model input.",
     )
-    parser.add_argument(
-        "--beta_lambda",
-        type=float,
-        default=1.0,
-        help="Weight for Beta prior regularization on spatial weights.",
-    )
-    parser.add_argument(
-        "--beta_alpha",
-        type=float,
-        default=1.1,
-        help="Alpha parameter of the Beta prior.",
-    )
-    parser.add_argument(
-        "--beta_beta",
-        type=float,
-        default=1.0,
-        help="Beta parameter of the Beta prior.",
-    )
-    parser.add_argument(
-        "--beta_prior_mode",
-        type=str,
-        default="full_beta",
-        choices=["full_beta", "repo_logbeta"],
-        help="Beta prior loss mode for spatial regularization weights.",
-    )
-
     return parser
 
 
@@ -277,14 +208,6 @@ def main(args):
     )
 
     save_path = get_psmareg_baseline_save_path(args)
-    spatially_varying_regularization = is_spatially_varying_model(
-        args.baseline_model,
-    )
-    beta_prior_loss = BetaPriorLoss(
-        alpha=args.beta_alpha,
-        beta=args.beta_beta,
-        mode=args.beta_prior_mode,
-    )
 
     print(f">>> PSMAReg root = {args.root_dir}")
     print(f">>> Train cases = {len(train_list)}")
@@ -294,13 +217,6 @@ def main(args):
     print(f">>> Baseline model = {args.baseline_model}")
     print(f">>> Model input = {list(input_keys)}")
     print(f">>> Smoothness lambda = {args.smoothness}")
-    print(f">>> Smoothness margin = {args.smoothness_margin}")
-    print(f">>> Beta lambda = {args.beta_lambda}")
-    print(
-        f">>> Beta prior = Beta({args.beta_alpha}, {args.beta_beta}), "
-        f"mode={args.beta_prior_mode}"
-    )
-    print(f">>> Spatially varying regularization = {spatially_varying_regularization}")
     print(f">>> Model will be saved to: {save_path}")
 
     for epoch in range(args.epochs):
@@ -310,11 +226,7 @@ def main(args):
             optimizer,
             identity_grid,
             smoothness_lambda=args.smoothness,
-            smoothness_margin=args.smoothness_margin,
-            beta_lambda=args.beta_lambda,
-            beta_prior_loss=beta_prior_loss,
             num_masks=args.num_masks,
-            spatially_varying_regularization=spatially_varying_regularization,
             input_keys=input_keys,
             mask_key=args.mask_key,
             device=device,

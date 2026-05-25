@@ -3,7 +3,6 @@ import os
 import sys
 
 import torch
-import torch.nn as nn
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -11,7 +10,6 @@ from General.data_loader import ReadH5d, create_data_loader
 from General.dataset_sample import split_multiple_train_test
 from Registration.baseline_models import build_baseline_model
 from Registration.inferencing import inference_batch
-from Registration.train_baseline import is_spatially_varying_model
 from Registration.training import get_registration_input_keys, make_identity_grid_m11
 
 
@@ -25,32 +23,6 @@ DEFAULT_RESULT_DIR = "/share/home/xcwu/pet_reg_results"
 CHECKPOINT_EXTENSIONS = {".pt", ".pth", ".ptm"}
 
 
-class BaselineInferenceWrapper(nn.Module):
-    """
-    Adapt baseline models to the interface expected by inferencing.inference_batch.
-
-    VoxelMorph and TransMorph receive concat(moving, fixed) and return a raw flow.
-    SVR-Diff receives moving/fixed separately and returns a dict whose ddf is
-    already tanh-normalized. inference_batch applies tanh to model output, so this
-    wrapper returns atanh(ddf) for SVR-Diff to preserve the trained displacement.
-    """
-
-    def __init__(self, model, spatially_varying=False, eps=1e-6):
-        super().__init__()
-        self.model = model
-        self.spatially_varying = spatially_varying
-        self.eps = eps
-
-    def forward(self, model_input):
-        if not self.spatially_varying:
-            return self.model(model_input)
-
-        moving, fixed = torch.chunk(model_input, chunks=2, dim=1)
-        outputs = self.model(moving, fixed)
-        ddf = outputs["ddf"].clamp(-1.0 + self.eps, 1.0 - self.eps)
-        return torch.atanh(ddf)
-
-
 def infer_model_name(weights_path, fallback):
     if fallback != "auto":
         return fallback
@@ -58,14 +30,12 @@ def infer_model_name(weights_path, fallback):
     name = os.path.basename(weights_path).lower().replace("-", "_")
     if "transmorph" in name:
         return "transmorph"
-    if "svr_diff" in name or "spatially_varying" in name:
-        return "svr_diff"
     if "voxelmorph" in name or "vxm" in name:
         return "voxelmorph"
 
     raise ValueError(
         "Cannot infer baseline model from checkpoint name. "
-        "Please pass --baseline_model voxelmorph, transmorph, or svr_diff."
+        "Please pass --baseline_model voxelmorph or transmorph."
     )
 
 
@@ -113,16 +83,10 @@ def build_test_loader(args):
 
 def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
     model_name = infer_model_name(weights_path, args.baseline_model)
-    spatially_varying = is_spatially_varying_model(model_name)
     input_keys = get_registration_input_keys(args.use_ct_input)
 
     base_model = build_baseline_model(model_name, in_channels=len(input_keys))
     load_state_dict(base_model, weights_path, args.device)
-
-    model = BaselineInferenceWrapper(
-        base_model,
-        spatially_varying=spatially_varying,
-    )
 
     output_path = make_output_path(weights_path, args.result_dir)
     if os.path.exists(output_path) and not args.overwrite:
@@ -135,7 +99,7 @@ def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
     print(f">>> Result: {output_path}")
 
     inference_batch(
-        model,
+        base_model,
         test_loader,
         identity_grid,
         filename=output_path,
@@ -174,10 +138,7 @@ def parse_args():
         choices=[
             "auto",
             "voxelmorph",
-            "vxm",
             "transmorph",
-            "svr_diff",
-            "spatially_varying_regularization",
         ],
         help="Baseline architecture. Use auto when checkpoint names include the model tag.",
     )
@@ -223,6 +184,26 @@ def parse_args():
         "--use_ct_input",
         action="store_true",
         help="Use [fdg_pt, fdg_ct, psma_pt, psma_ct] as model input.",
+    )
+    parser.add_argument(
+        "--ct_smoothness",
+        action="store_true",
+        help=(
+            "Mark that the checkpoint was trained with CT smoothness. "
+            "This is recorded for consistency; inference does not recompute loss."
+        ),
+    )
+    parser.add_argument(
+        "--ct_smoothness_margin",
+        type=float,
+        default=3000.0,
+        help="Margin value used for CT smoothness during training.",
+    )
+    parser.add_argument(
+        "--ct_smoothness_gamma",
+        type=float,
+        default=1.0,
+        help="Gamma value used for CT smoothness during training.",
     )
 
     return parser.parse_args()

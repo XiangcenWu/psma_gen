@@ -24,7 +24,7 @@ from Registration.inferencing import (
     mutual_information,
     normalized_cross_correlation,
 )
-from Registration.training import make_identity_grid_m11
+from Registration.training import make_identity_grid_m11, predict_ddf_and_grid
 
 
 DEFAULT_WEIGHTS_PATH = REGISTRATION_WEIGHTS_PATH
@@ -143,9 +143,7 @@ def make_case_json_from_h5(
     spacing = case_vars["spacing"]
 
     model_input = torch.cat([fdg_pt, psma_pt], dim=1)
-    ddf = torch.tanh(model(model_input))
-    grid = identity_grid + ddf
-    grid = grid.permute(0, 2, 3, 4, 1)
+    _, grid = predict_ddf_and_grid(model, model_input, identity_grid)
 
     warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
     warped_fdg_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
