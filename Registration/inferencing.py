@@ -10,6 +10,7 @@ import numpy as np
 
 from tqdm import tqdm
 from General.segments import SEGMENT_INDEX
+from Registration.diffeomorphic import predict_diffeomorphic_ddf_and_grid
 from Registration.training import (
     DEFAULT_REGISTRATION_INPUT_KEYS,
     make_registration_input,
@@ -56,7 +57,7 @@ def mutual_information(fixed, moving, num_bins=64):
 
 def get_binary_mask_with_label(mask: torch.tensor, label: int) -> torch.tensor:
 
-    mask = (mask == label).to(mask.dtype)
+    mask = (mask == label).float()
 
     return mask
 
@@ -220,6 +221,9 @@ def inference_batch(
         filename,
         masks_names=list(SEGMENT_INDEX.keys()), # list of names
         input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
+        diffeomorphic=False,
+        velocity_scale=0.5,
+        int_steps=7,
         device="cuda:0"
     ):
 
@@ -264,7 +268,16 @@ def inference_batch(
         
 
         _input = make_registration_input(batch, input_keys, device)
-        _, grid = predict_ddf_and_grid(model, _input, identity_grid)
+        if diffeomorphic:
+            _, grid = predict_diffeomorphic_ddf_and_grid(
+                model,
+                _input,
+                identity_grid,
+                velocity_scale=velocity_scale,
+                int_steps=int_steps,
+            )
+        else:
+            _, grid = predict_ddf_and_grid(model, _input, identity_grid)
 
         # warped_fdg_pt = torch.nn.functional.grid_sample(fdg_pt, grid)
         # mi_after.append(mutual_information(warped_fdg_pt, psma_pt).cpu().item())
@@ -277,7 +290,11 @@ def inference_batch(
             dice_before_lists[idx].append(dice_metric(binary_mask_fdg, binary_mask_psma).cpu().item())
             tre_before_lists[idx].append(compute_tre_single(binary_mask_fdg, binary_mask_psma, spacing).cpu().item())
 
-            warpped_fdg_mask = torch.nn.functional.grid_sample(binary_mask_fdg, grid)
+            warpped_fdg_mask = torch.nn.functional.grid_sample(
+                binary_mask_fdg,
+                grid,
+                align_corners=True,
+            )
 
             dice_after_lists[idx].append(dice_metric(warpped_fdg_mask, binary_mask_psma).cpu().item())
             tre_after_lists[idx].append(compute_tre_single(warpped_fdg_mask, binary_mask_psma, spacing).cpu().item())

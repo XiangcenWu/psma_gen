@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 def sample_labels_to_binary(mask):
     
-    binary_mask = (mask != 0).to(mask.dtype)
+    binary_mask = (mask != 0).float()
 
     return binary_mask
 

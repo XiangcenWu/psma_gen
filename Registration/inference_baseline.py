@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from General.data_loader import ReadH5d, create_data_loader
 from General.dataset_sample import split_multiple_train_test
 from Registration.baseline_models import build_baseline_model
+from Registration.diffeomorphic import get_diffeomorphic_tag
 from Registration.inferencing import inference_batch
 from Registration.training import get_registration_input_keys, make_identity_grid_m11
 
@@ -60,9 +61,23 @@ def list_weight_paths(weights_path):
     return sorted(paths)
 
 
-def make_output_path(weights_path, result_dir):
+def make_output_path(
+    weights_path,
+    result_dir,
+    diffeomorphic=False,
+    velocity_scale=0.5,
+    int_steps=7,
+):
     os.makedirs(result_dir, exist_ok=True)
-    output_name = os.path.splitext(os.path.basename(weights_path))[0] + ".txt"
+    output_stem = os.path.splitext(os.path.basename(weights_path))[0]
+    diffeomorphic_tag = get_diffeomorphic_tag(
+        diffeomorphic,
+        velocity_scale,
+        int_steps,
+    )
+    if diffeomorphic_tag and diffeomorphic_tag not in output_stem:
+        output_stem += diffeomorphic_tag
+    output_name = output_stem + ".txt"
     return os.path.join(result_dir, output_name)
 
 
@@ -88,13 +103,22 @@ def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
     base_model = build_baseline_model(model_name, in_channels=len(input_keys))
     load_state_dict(base_model, weights_path, args.device)
 
-    output_path = make_output_path(weights_path, args.result_dir)
+    output_path = make_output_path(
+        weights_path,
+        args.result_dir,
+        diffeomorphic=args.diffeomorphic,
+        velocity_scale=args.velocity_scale,
+        int_steps=args.int_steps,
+    )
     if os.path.exists(output_path) and not args.overwrite:
         print(f"Skip existing result: {output_path}")
         return
 
     print(f">>> Baseline model: {model_name}")
     print(f">>> Model input: {list(input_keys)}")
+    print(f">>> Diffeomorphic: {args.diffeomorphic}")
+    print(f">>> Velocity scale: {args.velocity_scale}")
+    print(f">>> Integration steps: {args.int_steps}")
     print(f">>> Weights: {weights_path}")
     print(f">>> Result: {output_path}")
 
@@ -105,10 +129,18 @@ def run_one_checkpoint(args, weights_path, test_loader, identity_grid):
         filename=output_path,
         device=args.device,
         input_keys=input_keys,
+        diffeomorphic=args.diffeomorphic,
+        velocity_scale=args.velocity_scale,
+        int_steps=args.int_steps,
     )
 
 
 def main(args):
+    if args.velocity_scale <= 0:
+        raise ValueError("--velocity_scale must be > 0.")
+    if args.int_steps < 0:
+        raise ValueError("--int_steps must be >= 0.")
+
     test_loader = build_test_loader(args)
     identity_grid = make_identity_grid_m11(args.spatial_size, device=args.device)
 
@@ -184,6 +216,23 @@ def parse_args():
         "--use_ct_input",
         action="store_true",
         help="Use [fdg_pt, fdg_ct, psma_pt, psma_ct] as model input.",
+    )
+    parser.add_argument(
+        "--diffeomorphic",
+        action="store_true",
+        help="Interpret model output as SVF and integrate it with scaling-and-squaring.",
+    )
+    parser.add_argument(
+        "--velocity_scale",
+        type=float,
+        default=0.5,
+        help="Scale applied to tanh(model_output) before SVF integration.",
+    )
+    parser.add_argument(
+        "--int_steps",
+        type=int,
+        default=7,
+        help="Number of scaling-and-squaring integration steps.",
     )
     parser.add_argument(
         "--ct_smoothness",

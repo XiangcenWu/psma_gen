@@ -9,6 +9,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from General.data_loader import create_data_loader, ReadH5d
 from General.dataset_sample import split_multiple_train_test
 from Registration.baseline_models import build_baseline_model
+from Registration.diffeomorphic import (
+    get_diffeomorphic_tag,
+    predict_diffeomorphic_ddf_and_grid,
+)
 from Registration.mask import sample_labels_to_binary, sample_shared_binary_masks
 from Registration.smoothness_losses import l2_gradient
 from Registration.training import (
@@ -33,10 +37,15 @@ def get_baseline_save_path(args):
             f"_mar{int(getattr(args, 'ct_smoothness_margin', 3000.0))}"
             f"_gam{getattr(args, 'ct_smoothness_gamma', 1.0):g}"
         )
+    diffeomorphic_tag = get_diffeomorphic_tag(
+        getattr(args, "diffeomorphic", False),
+        getattr(args, "velocity_scale", 0.5),
+        getattr(args, "int_steps", 7),
+    )
     return (
         "/share/home/xcwu/registration_v3/"
         f"{model_tag}_l{int(args.smoothness)}"
-        f"{mask_tag}{input_tag}{ct_smoothness_tag}.ptm"
+        f"{mask_tag}{input_tag}{ct_smoothness_tag}{diffeomorphic_tag}.ptm"
     )
 
 
@@ -65,6 +74,9 @@ def train_baseline_batch(
     ct_smoothness_gamma=1,
     num_masks=50,
     input_keys=DEFAULT_REGISTRATION_INPUT_KEYS,
+    diffeomorphic=False,
+    velocity_scale=0.5,
+    int_steps=7,
     device="cuda:0",
 ):
     model.train()
@@ -86,7 +98,17 @@ def train_baseline_batch(
 
         model_input = make_registration_input(batch, input_keys, device)
 
-        ddf, grid = predict_ddf_and_grid(model, model_input, identity_grid)
+        if diffeomorphic:
+            ddf, grid = predict_diffeomorphic_ddf_and_grid(
+                model,
+                model_input,
+                identity_grid,
+                velocity_scale=velocity_scale,
+                int_steps=int_steps,
+            )
+        else:
+            ddf, grid = predict_ddf_and_grid(model, model_input, identity_grid)
+
         if ct_smoothness:
             tensor_weights = get_ct_lambda(
                 fdg_ct,
@@ -105,8 +127,16 @@ def train_baseline_batch(
             device,
         )
 
-        warped_moving_masks = torch.nn.functional.grid_sample(fdg_masks, grid)
-        warped_moving_ct = torch.nn.functional.grid_sample(fdg_ct, grid)
+        warped_moving_masks = torch.nn.functional.grid_sample(
+            fdg_masks,
+            grid,
+            align_corners=True,
+        )
+        warped_moving_ct = torch.nn.functional.grid_sample(
+            fdg_ct,
+            grid,
+            align_corners=True,
+        )
 
         loss = (
             loss_function_dice(psma_masks, warped_moving_masks)
@@ -127,6 +157,10 @@ def train_baseline_batch(
 def main(args):
     device = args.device
     input_keys = get_registration_input_keys(args.use_ct_input)
+    if args.velocity_scale <= 0:
+        raise ValueError("--velocity_scale must be > 0.")
+    if args.int_steps < 0:
+        raise ValueError("--int_steps must be >= 0.")
 
     model = build_baseline_model(
         args.baseline_model,
@@ -166,6 +200,9 @@ def main(args):
     print(f">>> CT smoothness = {args.ct_smoothness}")
     print(f">>> CT smoothness margin = {args.ct_smoothness_margin}")
     print(f">>> CT smoothness gamma = {args.ct_smoothness_gamma}")
+    print(f">>> Diffeomorphic = {args.diffeomorphic}")
+    print(f">>> Velocity scale = {args.velocity_scale}")
+    print(f">>> Integration steps = {args.int_steps}")
     print(f">>> Model will be saved to: {save_path}")
 
     for epoch in range(args.epochs):
@@ -180,6 +217,9 @@ def main(args):
             ct_smoothness_gamma=args.ct_smoothness_gamma,
             num_masks=args.num_masks,
             input_keys=input_keys,
+            diffeomorphic=args.diffeomorphic,
+            velocity_scale=args.velocity_scale,
+            int_steps=args.int_steps,
             device=device,
         )
 
@@ -259,6 +299,23 @@ if __name__ == "__main__":
         type=float,
         default=1.0,
         help="Gamma value for CT smoothness regularization.",
+    )
+    parser.add_argument(
+        "--diffeomorphic",
+        action="store_true",
+        help="Interpret model output as SVF and integrate it with scaling-and-squaring.",
+    )
+    parser.add_argument(
+        "--velocity_scale",
+        type=float,
+        default=0.5,
+        help="Scale applied to tanh(model_output) before SVF integration.",
+    )
+    parser.add_argument(
+        "--int_steps",
+        type=int,
+        default=7,
+        help="Number of scaling-and-squaring integration steps.",
     )
 
     args = parser.parse_args()
