@@ -280,8 +280,10 @@ class SpatiallyVaryingRegularizationDiffReg3D(nn.Module):
 
     The model uses one shared 3D U-Net encoder-decoder and two heads:
     a direct DDF head and a voxel-wise regularization-weight head. The
-    regularization map is constrained to (eps, 1 - eps). Apply BetaPriorLoss to
-    regularization_map during training to impose the Beta distribution prior.
+    regularization map is predicted at a lower resolution, upsampled to the
+    DDF size for smoother spatial weights, and constrained to (eps, 1 - eps).
+    Apply BetaPriorLoss to regularization_map during training to impose the
+    Beta distribution prior.
     """
 
     def __init__(
@@ -291,10 +293,15 @@ class SpatiallyVaryingRegularizationDiffReg3D(nn.Module):
         enc_channels: Tuple[int, int, int, int, int] = (32, 64, 128, 256, 256),
         dec_channels: Tuple[int, int, int, int] = (256, 128, 64, 32),
         eps: float = 1e-6,
+        reg_map_downsample_factor: int = 2,
     ) -> None:
         super().__init__()
+        if reg_map_downsample_factor < 1:
+            raise ValueError("reg_map_downsample_factor must be >= 1.")
+
         c0, c1, c2, c3, c4 = enc_channels
         d3, d2, d1, d0 = dec_channels
+        self.reg_map_downsample_factor = int(reg_map_downsample_factor)
 
         self.encoder0 = ConvBlock3D(in_channels, c0, norm=True)
         self.encoder1 = ConvBlock3D(c0, c1, stride=2, norm=True)
@@ -324,12 +331,35 @@ class SpatiallyVaryingRegularizationDiffReg3D(nn.Module):
         y = self.decoder0(y, x0)
         return self.refine(y)
 
+    def predict_regularization_map(self, features: torch.Tensor) -> torch.Tensor:
+        factor = self.reg_map_downsample_factor
+        if factor == 1:
+            return self.reg_weight_head(features)
+
+        full_size = features.shape[2:]
+        low_res_size = tuple(max(1, size // factor) for size in full_size)
+
+        low_res_features = F.interpolate(
+            features,
+            size=low_res_size,
+            mode="trilinear",
+            align_corners=True,
+        )
+        low_res_map = self.reg_weight_head(low_res_features)
+
+        return F.interpolate(
+            low_res_map,
+            size=full_size,
+            mode="trilinear",
+            align_corners=True,
+        )
+
     def forward(self, moving: torch.Tensor, fixed: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = torch.cat([moving, fixed], dim=1)
         features = self.encode_decode(x)
         raw_flow = self.flow_head(features)
         ddf = torch.tanh(raw_flow)
-        regularization_map = self.reg_weight_head(features)
+        regularization_map = self.predict_regularization_map(features)
         return {
             "ddf": ddf,
             "regularization_map": regularization_map,
