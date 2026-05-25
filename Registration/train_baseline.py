@@ -26,6 +26,13 @@ from Registration.training import (
 )
 
 
+DEFAULT_SAVE_DIR = "/share/home/xcwu/registration_v3"
+
+
+def format_tag_value(value):
+    return f"{float(value):g}"
+
+
 def get_baseline_save_path(args):
     mask_tag = "" if args.num_masks == 0 else f"_k{args.num_masks}"
     input_tag = "_ctinput" if args.use_ct_input else ""
@@ -34,7 +41,7 @@ def get_baseline_save_path(args):
     if getattr(args, "ct_smoothness", False):
         ct_smoothness_tag = (
             f"_ctsmoothness"
-            f"_mar{int(getattr(args, 'ct_smoothness_margin', 3000.0))}"
+            f"_mar{format_tag_value(getattr(args, 'ct_smoothness_margin', 3000.0))}"
             f"_gam{getattr(args, 'ct_smoothness_gamma', 1.0):g}"
         )
     diffeomorphic_tag = get_diffeomorphic_tag(
@@ -42,11 +49,11 @@ def get_baseline_save_path(args):
         getattr(args, "velocity_scale", 0.5),
         getattr(args, "int_steps", 7),
     )
-    return (
-        "/share/home/xcwu/registration_v3/"
-        f"{model_tag}_l{int(args.smoothness)}"
+    save_name = (
+        f"{model_tag}_l{format_tag_value(args.smoothness)}"
         f"{mask_tag}{input_tag}{ct_smoothness_tag}{diffeomorphic_tag}.ptm"
     )
+    return os.path.join(getattr(args, "save_dir", DEFAULT_SAVE_DIR), save_name)
 
 
 def get_mask_loss_inputs(fdg_mask, psma_mask, num_masks, device):
@@ -193,6 +200,7 @@ def main(args):
     )
 
     save_path = get_baseline_save_path(args)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     print(f">>> Baseline model = {args.baseline_model}")
     print(f">>> Model input = {list(input_keys)}")
@@ -276,6 +284,12 @@ if __name__ == "__main__":
         type=str,
         default="cuda:0",
         help="Training device",
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default=DEFAULT_SAVE_DIR,
+        help="Directory where trained checkpoint will be saved.",
     )
 
     parser.add_argument(
