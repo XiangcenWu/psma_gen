@@ -311,7 +311,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ct_smoothness_gamma",
         type=float,
-        default=1.0,
+        default=2.0,
         help="Gamma value for CT smoothness regularization.",
     )
     parser.add_argument(
