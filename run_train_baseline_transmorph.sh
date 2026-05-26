@@ -15,22 +15,11 @@ conda activate gen
 cd ~/projects/psma_gen
 
 python Registration/train_baseline.py \
-    --baseline_model transmorph \
-    --smoothness 7000 \
-    --epochs 350 \
-    --num_masks 10 \
-    --lr 1e-5 \
-    --device cuda:0 \
-    --use_ct_input \
-    --diffeomorphic \
-    --ct_smoothness
-
-python Registration/train_baseline.py \
-    --baseline_model transmorph \
-    --smoothness 7000 \
-    --epochs 350 \
-    --num_masks 10 \
-    --lr 1e-5 \
-    --device cuda:0 \
-    --diffeomorphic \
-    --ct_smoothness
+  --baseline_model transmorph \
+  --smoothness 7000 \
+  --epochs 350 \
+  --num_masks 10 \
+  --lr 1e-5 \
+  --device cuda:0 \
+  --diffeomorphic \
+  --ct_smoothness
