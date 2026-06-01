@@ -3,7 +3,7 @@ import torch
 from General.segments import SEGMENT_INDEX
 
 
-LLM_MODEL_PATH = "llm_models/Qwen3.5-9B"
+LLM_MODEL_PATH = "llm_models/gpt-oss-20b"
 REGISTRATION_WEIGHTS_PATH = "/data1/xiangcen/models/registration_v2/ctsmoothness_l4500_k10_mar3000_gam2.0.ptm"
 SINGLE_CASE_OUTPUT_DIR = "/share/home/xcwu/pet_reg_results_llm/single_case_json"
 DEFAULT_PATIENT_PATH = "/data2/xiangcen/data/pet_gen/processed/batch3_h5_v2/patient_0066.h5"
