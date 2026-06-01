@@ -1,6 +1,6 @@
 import SimpleITK as sitk
 import torch
-from monai.transforms import ScaleIntensityRangePercentiles, Resize
+from monai.transforms import ScaleIntensityRangePercentiles, ScaleIntensityRanged, Resize
 import os
 import h5py
 from tqdm import tqdm
@@ -53,6 +53,7 @@ def get_nii_spacing(itk_image: sitk.Image):
 
 
 def save_h5(file_name: str,
+            patient_name: str,
             fdg_ct_tensor: torch.tensor,
             fdg_pt_tensor: torch.tensor,
             fdg_mask_tensor: torch.tensor,
@@ -64,6 +65,7 @@ def save_h5(file_name: str,
             ):
 
     with h5py.File(file_name, 'w') as h5_file:
+        h5_file.create_dataset('patient_name', data=patient_name, dtype=h5py.string_dtype(encoding='utf-8'))
         h5_file.create_dataset('fdg_ct', data=fdg_ct_tensor)
         h5_file.create_dataset('fdg_pt', data=fdg_pt_tensor)
         h5_file.create_dataset('fdg_mask', data=fdg_mask_tensor)
@@ -134,17 +136,18 @@ def crop_and_intensity(patient_dir,
                     lower=1,
                     upper=99,
                     b_min=0,
-                    b_max=1,):
+                    b_max=1,
+                    ct_intensity="percentile",):
 
     os.makedirs(save_dir, exist_ok=True)
 
 
-    patient_dir = [os.path.join(patient_dir, patient_name) for patient_name in os.listdir(patient_dir)]
+    patient_dir = [(patient_name, os.path.join(patient_dir, patient_name)) for patient_name in os.listdir(patient_dir)]
 
     
-    for idx, dir in enumerate(tqdm(patient_dir, desc="cropping and intensity range", unit="case")):
+    for idx, (patient_name, dir) in enumerate(tqdm(patient_dir, desc="cropping and intensity range", unit="case")):
 
-        patient_name = f"patient_{idx:04d}.h5"
+        h5_name = f"patient_{idx:04d}.h5"
         
         # load all ct and pt images
         fdg_ct = read_nii(os.path.join(dir, 'fdgCT_series2.nii.gz'))
@@ -224,17 +227,41 @@ def crop_and_intensity(patient_dir,
 
 
         scaler = ScaleIntensityRangePercentiles(lower, upper, b_min, b_max, clip=True)
+        image_keys = ["fdg_ct", "psma_ct"]
+        if ct_intensity == "percentile":
+            ct_scaler = scaler
+        elif ct_intensity == "range":
+            ct_scaler = ScaleIntensityRanged(
+                keys=image_keys,
+                a_min=-1000,
+                a_max=1000,
+                b_min=0.0,
+                b_max=1.0,
+                clip=True,
+            )
+        else:
+            raise ValueError("ct_intensity must be 'percentile' or 'range'")
         resizer = Resize(img_size, mode="trilinear")
         resizer_mask = Resize(img_size, mode="nearest-exact")
 
 
 
-        fdg_ct = resizer(scaler(fdg_ct.unsqueeze(0)))
+        fdg_ct = fdg_ct.unsqueeze(0)
+        psma_ct = psma_ct.unsqueeze(0)
+        if ct_intensity == "range":
+            ct_data = ct_scaler({"fdg_ct": fdg_ct, "psma_ct": psma_ct})
+            fdg_ct = ct_data["fdg_ct"]
+            psma_ct = ct_data["psma_ct"]
+        else:
+            fdg_ct = ct_scaler(fdg_ct)
+            psma_ct = ct_scaler(psma_ct)
+
+        fdg_ct = resizer(fdg_ct)
         fdg_pt = resizer(scaler(fdg_pt.unsqueeze(0)))
         fdg_mask = resizer_mask(fdg_mask.unsqueeze(0))
 
 
-        psma_ct = resizer(scaler(psma_ct.unsqueeze(0)))
+        psma_ct = resizer(psma_ct)
         psma_pt = resizer(scaler(psma_pt.unsqueeze(0)))
         psma_mask = resizer_mask(psma_mask.unsqueeze(0))
 
@@ -243,7 +270,8 @@ def crop_and_intensity(patient_dir,
         
         
         save_h5(
-            os.path.join(save_dir, patient_name),
+            patient_name,
+            patient_name,
             fdg_ct,
             fdg_pt,
             fdg_mask,
@@ -323,12 +351,15 @@ if __name__ == "__main__":
 
     crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
     save_dir='/data/xiangcen/pet_gen/processed/batch1_h5',
-    img_size=(128, 128, 384))
+    img_size=(128, 128, 384),
+    ct_intensity="range")
 
     crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch2', 
     save_dir='/data/xiangcen/pet_gen/processed/batch2_h5',
-    img_size=(128, 128, 384))
+    img_size=(128, 128, 384),
+    ct_intensity="range")
     
-    # crop_and_intensity_debug(patient_dir='/data/xiangcen/pet_gen/processed/batch1', 
-    # save_dir='/data/xiangcen/pet_gen/processed/debug',
-    # img_size=(128, 128, 384))
+    crop_and_intensity(patient_dir='/data/xiangcen/pet_gen/processed/batch3', 
+    save_dir='/data/xiangcen/pet_gen/processed/batch3_h5',
+    img_size=(128, 128, 384),
+    ct_intensity="range")
