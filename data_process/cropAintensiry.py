@@ -270,7 +270,7 @@ def crop_and_intensity(patient_dir,
         
         
         save_h5(
-            patient_name,
+            os.path.join(save_dir, h5_name),
             patient_name,
             fdg_ct,
             fdg_pt,
