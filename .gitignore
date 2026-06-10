@@ -12,3 +12,4 @@ llm_models
 *.nii.gz
 *png
 *.json
+Generation/vae_models
