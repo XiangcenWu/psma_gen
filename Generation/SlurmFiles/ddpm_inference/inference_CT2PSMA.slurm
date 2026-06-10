@@ -15,8 +15,6 @@ conda activate gen
 cd ~/projects/psma_gen
 
 python Generation/inference_ddpm.py \
-    --data-dirs /data2/xiangcen/data/pet_gen/processed/batch1_h5_v2 /data2/xiangcen/data/pet_gen/processed/batch2_h5_v2 \
-    --val-counts 40 40 \
     --input-key psma_ct \
     --target-key psma_pt \
     --checkpoint-path /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt/psma_ct_to_psma_pt.pth \
