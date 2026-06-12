@@ -60,8 +60,8 @@ def parse_args():
 
 
 def main(args):
-    if len(args.data_dirs) != len(args.val_counts):
-        raise ValueError("--data-dirs and --val-counts must have the same length")
+    # if len(args.data_dirs) != len(args.val_counts):
+    #     raise ValueError("--data-dirs and --val-counts must have the same length")
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -102,7 +102,7 @@ def main(args):
     if args.use_fdg_condition:
         condition_desc = f"{args.input_key} + {args.fdg_key}"
     print(f">>> Conditioning: {condition_desc} -> {args.target_key}")
-    print(f">>> Train samples: {len(train_list)} | Val samples: {len(val_list)}")
+    print(f">>> Train samples: {len(train_list)} | test samples: {len(test_list)}")
     print(f">>> Model will be saved to: {save_dir}")
 
     for epoch in range(args.epochs):

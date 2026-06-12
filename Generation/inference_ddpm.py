@@ -8,24 +8,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from General.data_loader import ReadH5d, create_data_loader
 from General.dataset_sample import split_multiple_train_test
 from Generation.DDPM_Baseline import CTtoPETDiffusion, run_inference
-from Generation.train_ddpm import DEFAULT_DATA_DIRS, DEFAULT_VAL_COUNTS
+
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="3D DDPM inference")
-    parser.add_argument(
-        "--data-dirs",
-        nargs="+",
-        default=DEFAULT_DATA_DIRS,
-        help="Directories that contain processed H5 files",
-    )
-    parser.add_argument(
-        "--val-counts",
-        nargs="+",
-        type=int,
-        default=DEFAULT_VAL_COUNTS,
-        help="Validation sample counts for each directory",
-    )
     parser.add_argument(
         "--input-key",
         type=str,
@@ -92,18 +79,21 @@ def parse_args():
 
 
 def main(args):
-    if len(args.data_dirs) != len(args.val_counts):
-        raise ValueError("--data-dirs and --val-counts must have the same length")
+    # if len(args.data_dirs) != len(args.val_counts):
+    #     raise ValueError("--data-dirs and --val-counts must have the same length")
 
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
 
     transform = ReadH5d()
-    _, test_list = split_multiple_train_test(
-        args.data_dirs,
-        args.val_counts,
-        args.seed,
+    train_list, test_list = split_multiple_train_test(
+        [
+            "/data2/xiangcen/data/pet_gen/processed/batch1_h5_v2",
+            "/data2/xiangcen/data/pet_gen/processed/batch2_h5_v2",
+            "/data2/xiangcen/data/pet_gen/processed/batch3_h5_v2",
+        ],
+        [40, 40, 20],
     )
     print(test_list[:5])  # 打印前5个测试样本路径以验证
 
