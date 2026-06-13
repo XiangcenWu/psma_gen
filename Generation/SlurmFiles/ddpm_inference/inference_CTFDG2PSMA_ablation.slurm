@@ -17,8 +17,7 @@ cd ~/projects/psma_gen
 python Generation/inference_ddpm.py \
     --input-key psma_ct \
     --target-key psma_pt \
-    --use-fdg-condition \
-    --fdg-key fdg_pt \
+    --fdg-condition fdg \
     --checkpoint-path /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt/psma_ct_fdg_pt_to_psma_pt.pth \
     --output-dir ~/results/generation_ddpm/psma_ct_fdg_pt_to_psma_pt \
     --device cuda:0 \

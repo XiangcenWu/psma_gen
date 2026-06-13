@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ddpm_infer_ct
+#SBATCH --job-name=ddpm_infer_warped_fdg
 #SBATCH --partition=gpu
 #SBATCH --nodelist=gpu02
 #SBATCH --nodes=1
@@ -7,8 +7,8 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
-#SBATCH --output=ddpm_infer_ct_%j.out
-#SBATCH --error=ddpm_infer_ct_%j.err
+#SBATCH --output=ddpm_infer_warped_fdg_%j.out
+#SBATCH --error=ddpm_infer_warped_fdg_%j.err
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate gen
@@ -17,9 +17,9 @@ cd ~/projects/psma_gen
 python Generation/inference_ddpm.py \
     --input-key psma_ct \
     --target-key psma_pt \
-    --fdg-condition none \
-    --checkpoint-path /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt/psma_ct_to_psma_pt.pth \
-    --output-dir ~/results/generation_ddpm/psma_ct_to_psma_pt \
+    --fdg-condition warped_fdg \
+    --checkpoint-path /data1/xiangcen/models/generation_ddpm/psma_ct_to_psma_pt/psma_ct_warped_fdg_pet_to_psma_pt.pth \
+    --output-dir ~/results/generation_ddpm/psma_ct_warped_fdg_pet_to_psma_pt \
     --device cuda:0 \
     --num-inference-steps 1000 \
     --batch-size 4

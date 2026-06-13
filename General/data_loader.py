@@ -41,11 +41,19 @@ def load_h5(file_name: str):
 
 def read_h5_to_dict(file_name: str):
     h5_file = load_h5(file_name)
-    return {'fdg_ct': h5_file[0], 'fdg_pt': h5_file[1], \
+    data = {'fdg_ct': h5_file[0], 'fdg_pt': h5_file[1], \
             'fdg_mask': h5_file[2], \
             'psma_ct': h5_file[3], 'psma_pt': h5_file[4], \
             'psma_mask': h5_file[5], \
             'fdg_spacing': h5_file[6], 'psma_spacing': h5_file[7]}
+
+    with h5py.File(file_name, 'r') as source_h5:
+        if 'warped_fdg_pet' in source_h5:
+            data['warped_fdg_pet'] = torch.from_numpy(
+                source_h5['warped_fdg_pet'][:]
+            )
+
+    return data
 
 
 

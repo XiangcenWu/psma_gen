@@ -30,6 +30,11 @@ def get_pair(
     target = resize_half(target)
 
     if use_fdg_condition:
+        if fdg_key not in batch:
+            raise KeyError(
+                f"FDG condition key '{fdg_key}' is missing from the loaded H5 data. "
+                f"Available keys: {sorted(batch)}"
+            )
         fdg = batch[fdg_key].float().to(device)
         fdg = resize_half(fdg)
         condition = torch.cat([condition, fdg], dim=1)

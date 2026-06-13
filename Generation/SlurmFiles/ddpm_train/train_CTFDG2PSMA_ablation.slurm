@@ -17,8 +17,7 @@ cd ~/projects/psma_gen
 python Generation/train_ddpm.py \
     --input-key psma_ct \
     --target-key psma_pt \
-    --use-fdg-condition \
-    --fdg-key fdg_pt \
+    --fdg-condition fdg \
     --epochs 500 \
     --batch-size 8 \
     --lr 1e-4 \
