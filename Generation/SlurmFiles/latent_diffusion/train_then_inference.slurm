@@ -29,12 +29,9 @@ python Generation/latent_diffusion.py \
     --target-key psma_pt \
     --fdg-condition warped_fdg \
     --image-size 128 128 384 \
-    --target-latent-channels 4 \
-    --condition-latent-channels 4 \
     --target-latent-scale 1.0 \
     --condition-latent-scale 1.0 \
-    --vae-channels 8 16 32 64 128 \
-    --diffusion-channels 32 64 128 \
+    --diffusion-channels 64 128 256 \
     --vae-epochs 100 \
     --diffusion-epochs 500 \
     --vae-lr 1e-4 \
@@ -42,7 +39,7 @@ python Generation/latent_diffusion.py \
     --kl-weight 1e-6 \
     --num-train-timesteps 1000 \
     --amp \
-    --batch-size 1 \
+    --batch-size 8 \
     --data-dirs ${DATA_DIR_1} ${DATA_DIR_2} ${DATA_DIR_3} \
     --val-counts 40 40 20 \
     --save-dir ${MODEL_DIR} \

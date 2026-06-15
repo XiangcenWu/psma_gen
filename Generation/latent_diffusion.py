@@ -27,6 +27,9 @@ DEFAULT_DATA_DIRS = [
     "/data2/xiangcen/data/pet_gen/processed/warped_fdg_pet_h5/batch2_h5_v2",
     "/data2/xiangcen/data/pet_gen/processed/warped_fdg_pet_h5/batch3_h5_v2",
 ]
+DEFAULT_IMAGE_SIZE = (128, 128, 384)
+DEFAULT_LATENT_CHANNELS = 8
+DEFAULT_VAE_CHANNELS = (16, 32, 64, 128, 256)
 
 
 def resize_volume(volume, image_size, mode="trilinear"):
@@ -43,7 +46,7 @@ def get_latent_pair(
     input_key,
     target_key,
     device,
-    image_size=(128, 128, 384),
+    image_size=DEFAULT_IMAGE_SIZE,
     fdg_key="warped_fdg_pet",
 ):
     """Load and resize the condition and target used by latent diffusion."""
@@ -93,13 +96,13 @@ class ConvBlock3D(nn.Module):
 
 
 class AutoencoderKL3D(nn.Module):
-    """Small 3D KL autoencoder for target or condition volumes."""
+    """3D KL autoencoder configured for 128 x 128 x 384 volumes."""
 
     def __init__(
         self,
         in_channels=1,
-        latent_channels=4,
-        channels=(8, 16, 32, 64, 128),
+        latent_channels=DEFAULT_LATENT_CHANNELS,
+        channels=DEFAULT_VAE_CHANNELS,
     ):
         super().__init__()
         if len(channels) < 2:
@@ -606,19 +609,27 @@ def parse_args():
         "--image-size",
         nargs=3,
         type=int,
-        default=[128, 128, 384],
+        default=list(DEFAULT_IMAGE_SIZE),
         metavar=("X", "Y", "Z"),
         help="Volume size used by get_latent_pair, for example: 128 128 384",
     )
-    parser.add_argument("--target-latent-channels", type=int, default=4)
-    parser.add_argument("--condition-latent-channels", type=int, default=4)
+    parser.add_argument(
+        "--target-latent-channels",
+        type=int,
+        default=DEFAULT_LATENT_CHANNELS,
+    )
+    parser.add_argument(
+        "--condition-latent-channels",
+        type=int,
+        default=DEFAULT_LATENT_CHANNELS,
+    )
     parser.add_argument("--target-latent-scale", type=float, default=1.0)
     parser.add_argument("--condition-latent-scale", type=float, default=1.0)
     parser.add_argument(
         "--vae-channels",
         nargs="+",
         type=int,
-        default=[8, 16, 32, 64, 128],
+        default=list(DEFAULT_VAE_CHANNELS),
     )
     parser.add_argument(
         "--diffusion-channels",
@@ -857,6 +868,10 @@ def main(args):
             num_train_timesteps=args.num_train_timesteps,
             use_flash_attention=args.use_flash_attention,
             device=args.device,
+        )
+        print(
+            f">>> Diffusion parameters: "
+            f"{sum(parameter.numel() for parameter in diffusion.model.parameters()):,}"
         )
         diffusion_optimizer = torch.optim.AdamW(
             diffusion.model.parameters(),
