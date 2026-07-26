@@ -13,3 +13,4 @@ llm_models
 *png
 *.json
 Generation/vae_models
+*.pdf
