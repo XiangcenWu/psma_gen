@@ -1,6 +1,6 @@
 # Strict-JSON PET/PDF-RAG inference
 
-`infer.py` processes the 249 patients in
+`infer/infer.py` processes the 249 patients in
 `agentic_pca/agent_dataset/FDG&PSMA双探针_clean_en_with_report.json`.
 For every independent trajectory it:
 
@@ -61,7 +61,7 @@ model:
 
 ```bash
 /share/home/xcwu/miniconda3/envs/gen/bin/python \
-  agentic_pca/retrieval_agent_inference/infer.py \
+  agentic_pca/retrieval_agent_inference/infer/infer.py \
   --dry-run
 ```
 
@@ -70,7 +70,7 @@ per-trajectory files, and resume logic without loading Qwen:
 
 ```bash
 /share/home/xcwu/miniconda3/envs/gen/bin/python \
-  agentic_pca/retrieval_agent_inference/infer.py \
+  agentic_pca/retrieval_agent_inference/infer/infer.py \
   --mock-model --mock-invalid-first \
   --max-patients 2 --num-trajectories 2 \
   --output-dir /tmp/pet_rag_mock
@@ -82,7 +82,7 @@ Run one patient and two independent trajectories before the full cohort:
 
 ```bash
 /share/home/xcwu/miniconda3/envs/gen/bin/python \
-  agentic_pca/retrieval_agent_inference/infer.py \
+  agentic_pca/retrieval_agent_inference/infer/infer.py \
   --device cuda \
   --max-patients 1 \
   --num-trajectories 2 \
@@ -93,7 +93,7 @@ For the complete dataset:
 
 ```bash
 /share/home/xcwu/miniconda3/envs/gen/bin/python \
-  agentic_pca/retrieval_agent_inference/infer.py \
+  agentic_pca/retrieval_agent_inference/infer/infer.py \
   --device cuda \
   --num-trajectories 5 \
   --output-dir agentic_pca/retrieval_agent_inference/outputs/full_run
@@ -109,13 +109,13 @@ On this Slurm cluster, submit a one-patient GPU smoke test with:
 
 ```bash
 sbatch --export=ALL,MAX_PATIENTS=1,NUM_TRAJECTORIES=1,OUTPUT_DIR=agentic_pca/retrieval_agent_inference/outputs/slurm_smoke \
-  agentic_pca/retrieval_agent_inference/infer.slurm
+  agentic_pca/retrieval_agent_inference/infer/infer.slurm
 ```
 
 After inspecting its JSON and log, submit the resumable full run:
 
 ```bash
-sbatch agentic_pca/retrieval_agent_inference/infer.slurm
+sbatch agentic_pca/retrieval_agent_inference/infer/infer.slurm
 ```
 
 Useful controls include:
@@ -169,7 +169,7 @@ Validate the full reference corpus without loading the model:
 
 ```bash
 /share/home/xcwu/miniconda3/envs/gen/bin/python \
-  agentic_pca/retrieval_agent_inference/infer.py \
+  agentic_pca/retrieval_agent_inference/infer/infer.py \
   --dry-run \
   --trajectory-rag-dir \
     agentic_pca/retrieval_agent_inference/outputs/full_run
@@ -179,7 +179,7 @@ Run a mock orchestration test:
 
 ```bash
 /share/home/xcwu/miniconda3/envs/gen/bin/python \
-  agentic_pca/retrieval_agent_inference/infer.py \
+  agentic_pca/retrieval_agent_inference/infer/infer.py \
   --mock-model --mock-invalid-first \
   --trajectory-rag-dir \
     agentic_pca/retrieval_agent_inference/outputs/full_run \
@@ -192,7 +192,7 @@ Run all 249 patients with five new trajectories per patient:
 
 ```bash
 /share/home/xcwu/miniconda3/envs/gen/bin/python \
-  agentic_pca/retrieval_agent_inference/infer.py \
+  agentic_pca/retrieval_agent_inference/infer/infer.py \
   --device cuda \
   --trajectory-rag-dir \
     agentic_pca/retrieval_agent_inference/outputs/full_run \
@@ -212,7 +212,7 @@ Never set `--output-dir` to the reference `--trajectory-rag-dir`.
 The equivalent Slurm submission is:
 
 ```bash
-sbatch agentic_pca/retrieval_agent_inference/trajectory_rag.slurm
+sbatch agentic_pca/retrieval_agent_inference/trajectory_rag/trajectory_rag.slurm
 ```
 
 ## Label mapping

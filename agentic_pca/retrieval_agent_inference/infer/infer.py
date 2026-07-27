@@ -19,7 +19,7 @@ from typing import Any, Callable, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -38,7 +38,7 @@ DEFAULT_DATASET = ROOT / "agentic_pca/agent_dataset/FDG&PSMA双探针_clean_en_w
 DEFAULT_SUV_DIR = ROOT / "agentic_pca/agent_dataset/suv_output_by_patient"
 DEFAULT_PDF_DIR = ROOT / "agentic_pca/agent_dataset/papers"
 DEFAULT_MODEL = ROOT / "llm_models/Qwen3.5-9B"
-DEFAULT_OUTPUT_ROOT = Path(__file__).resolve().parent / "outputs"
+DEFAULT_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "outputs"
 
 SCHEMA_VERSION = "1.0"
 LABEL_MAPPING_VERSION = "observed-management-v1"
@@ -879,12 +879,16 @@ def generate_trajectory(
         if trajectory_rag is not None:
             evidence_selection_payload["trajectory_rag"] = {
                 "organ_hints": trajectory_rag["organ_hints"],
-                "literature_query_hints": trajectory_rag["literature_query_hints"],
+                "literature_query_hints": trajectory_rag[
+                    "literature_query_hints"
+                ],
                 "similar_patient_inputs": [
                     {
                         "source_trajectory_id": item["source_trajectory_id"],
                         "retrieval_score": item["retrieval_score"],
-                        "historical_patient_input": item["historical_patient_input"],
+                        "historical_patient_input": item[
+                            "historical_patient_input"
+                        ],
                         "historical_evidence_selection": item[
                             "historical_evidence_selection"
                         ],
@@ -1031,7 +1035,9 @@ def inference_config(
             ROOT / "agentic_pca/pdf_rag/pdf_rag_agent.py"
         ),
         "trajectory_rag_code_sha256": sha256_file(
-            Path(__file__).resolve().parent / "trajectory_rag.py"
+            Path(__file__).resolve().parents[1]
+            / "trajectory_rag"
+            / "trajectory_rag.py"
         ),
         "dependency_versions": dependency_versions(),
         "dataset": str(args.dataset),
